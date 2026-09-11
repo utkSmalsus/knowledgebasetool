@@ -15,7 +15,7 @@ import {
   btn,
   input,
 } from '../components/ui'
-import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, typeDef } from '../kb/schema'
+import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, TYPE_DECISION_HELPER, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { Attachment, Details, Entry, Evidence, EntryStatus, REVIEW_INTERVALS, Visibility } from '../types'
 
@@ -244,6 +244,19 @@ export default function EntryForm() {
                 )
               })}
             </div>
+
+            <details className="mt-4 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
+              <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                Not sure which type to choose?
+              </summary>
+              <ul className="space-y-1 px-3 pb-3 text-xs text-slate-500 dark:text-slate-400">
+                {TYPE_DECISION_HELPER.map((h) => (
+                  <li key={h.type}>
+                    &ldquo;{h.prompt}&rdquo; → <span className="font-medium text-slate-700 dark:text-slate-200">{typeDef(h.type).label}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           </div>
         )}
 

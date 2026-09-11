@@ -1,11 +1,13 @@
-import { Entry } from '../types'
+import { Entry, isExpired } from '../types'
 
 const daysSince = (iso?: string, now = Date.now()) =>
   iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : Infinity
 
 /**
  * A knowledge base rots quietly. This surfaces the entries that need a human:
- * unverified runbooks, unfinished handovers, research that stalled, old drafts.
+ * flagged or expired verification, stalled research, old drafts. Driven by
+ * the real Verification system and Research's own stage — not by ad hoc
+ * per-type proxies, so it works the same for every type in the taxonomy.
  */
 export function needsAttention(entries: Entry[], now = Date.now()): { entry: Entry; reason: string }[] {
   const out: { entry: Entry; reason: string }[] = []
@@ -13,22 +15,14 @@ export function needsAttention(entries: Entry[], now = Date.now()): { entry: Ent
   for (const e of entries) {
     if (e.status === 'archived') continue
 
-    if (e.type === 'howto') {
-      const verified = daysSince(e.details.lastVerified as string | undefined, now)
-      if (e.stage === 'stale') out.push({ entry: e, reason: 'Runbook marked needs review' })
-      else if (verified > 180) out.push({ entry: e, reason: 'Runbook not verified in 6+ months' })
+    if (e.verification.state === 'needs_update') {
+      out.push({ entry: e, reason: 'Flagged as needing an update' })
+    } else if (isExpired(e.verification, now)) {
+      out.push({ entry: e, reason: 'Verification expired — due for re-review' })
     }
 
-    if (e.type === 'kt' && (e.stage === 'scheduled' || e.stage === 'in_progress')) {
-      out.push({ entry: e, reason: 'Handover not finished' })
-    }
-
-    if (e.type === 'research' && e.stage === 'in_progress' && daysSince(e.updatedAt, now) > 45) {
+    if ((e.type === 'research' || e.type === 'ai_research') && e.stage === 'in_progress' && daysSince(e.updatedAt, now) > 45) {
       out.push({ entry: e, reason: `Research stalled — no update in ${daysSince(e.updatedAt, now)} days` })
-    }
-
-    if (e.type === 'postmortem' && e.stage === 'actions_open') {
-      out.push({ entry: e, reason: 'Incident action items still open' })
     }
 
     if (e.status === 'draft' && daysSince(e.updatedAt, now) > 30) {

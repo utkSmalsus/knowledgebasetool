@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { seedCategories, seedEntries, seedPortfolios, seedUsers } from '../data/seed'
+import { migrateEntryType } from '../kb/migrate'
 import {
   Category,
   Comment,
@@ -14,7 +15,11 @@ import {
   visibleTo,
 } from '../types'
 
-const KEY = 'hochhuth-kb.v3'
+// v4: the knowledge taxonomy was simplified from 7 overlapping types down to
+// 6 (see src/kb/schema.ts and src/kb/migrate.ts). Anyone with v3 data still in
+// their browser gets migrated in place below — nothing is deleted.
+const KEY = 'hochhuth-kb.v4'
+const LEGACY_KEYS = ['hochhuth-kb.v3']
 
 interface Persisted {
   entries: Entry[]
@@ -40,12 +45,22 @@ const emptyPersisted = (): Persisted => ({
 function load(): Persisted {
   const fallback = emptyPersisted()
   try {
-    const raw = localStorage.getItem(KEY)
+    let raw = localStorage.getItem(KEY)
+    if (!raw) {
+      // nothing at the current key — check for pre-taxonomy-change data before giving up
+      for (const legacyKey of LEGACY_KEYS) {
+        const legacy = localStorage.getItem(legacyKey)
+        if (legacy) {
+          raw = legacy
+          break
+        }
+      }
+    }
     if (!raw) return fallback
     const parsed = JSON.parse(raw) as Partial<Persisted>
     if (!Array.isArray(parsed.entries)) return fallback
     return {
-      entries: parsed.entries,
+      entries: parsed.entries.map(migrateEntryType),
       categories: Array.isArray(parsed.categories) ? parsed.categories : seedCategories,
       portfolios: Array.isArray(parsed.portfolios) ? parsed.portfolios : seedPortfolios,
       role: parsed.role ?? 'admin',

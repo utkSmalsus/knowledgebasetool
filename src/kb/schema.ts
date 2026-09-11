@@ -1,6 +1,18 @@
 // The whole point of this file: adding a new kind of knowledge = one entry in
 // ENTRY_TYPES. No new components, no `if (type === ...)` anywhere in the app.
 // Forms, detail pages, filters and badges all render from these definitions.
+//
+// Taxonomy: exactly six top-level types, chosen so every entry answers one
+// question — "what is the PURPOSE of this knowledge?" — without overlap:
+//   Article      -> explain something
+//   Research     -> investigate something
+//   AI Research  -> investigate something AI/ML/LLM-related
+//   Decision     -> explain why we chose something
+//   Solution     -> explain how we solved a problem
+//   Runbook      -> explain how to perform an operational task
+// Don't add a 7th type for an edge case — stretch the closest of these six
+// plus tags/category instead. See src/kb/migrate.ts for how the previous
+// (more fragmented) taxonomy maps onto this one.
 
 export type Tone = 'gray' | 'blue' | 'green' | 'red' | 'amber' | 'violet' | 'teal'
 
@@ -41,98 +53,64 @@ export interface EntryTypeDef {
   fields: FieldDef[]
 }
 
+// Shared by Research and AI Research — same shape, same questions, just a
+// different domain. Defined once so the two stay identical on purpose.
+const RESEARCH_FIELDS: FieldDef[] = [
+  { key: 'question', label: 'Question / hypothesis', kind: 'markdown', required: true, hint: 'What were you trying to find out?' },
+  { key: 'method', label: 'Methodology', kind: 'markdown', hint: 'How did you investigate it?' },
+  { key: 'findings', label: 'Findings', kind: 'markdown', hint: 'What did you actually find?' },
+  { key: 'conclusion', label: 'Conclusion & next steps', kind: 'markdown' },
+  { key: 'period', label: 'Time period', kind: 'text', half: true, hint: 'e.g. Aug–Sep 2026' },
+  { key: 'collaborators', label: 'Collaborators', kind: 'list', half: true },
+  { key: 'effort', label: 'Effort spent', kind: 'text', half: true, hint: 'e.g. 6 person-days' },
+]
+
+const RESEARCH_STAGES: Stage[] = [
+  { key: 'proposed', label: 'Proposed', tone: 'gray' },
+  { key: 'in_progress', label: 'In progress', tone: 'blue' },
+  { key: 'implemented', label: 'Implemented', tone: 'green' },
+  { key: 'rejected', label: 'Rejected', tone: 'red' },
+  { key: 'on_hold', label: 'On hold', tone: 'amber' },
+]
+
 export const ENTRY_TYPES = {
   article: {
-    label: 'Knowledge article',
-    plural: 'Knowledge articles',
-    monogram: 'KA',
+    label: 'Article',
+    plural: 'Articles',
+    monogram: 'A',
     tone: 'blue',
-    blurb: 'How something works, a policy, a project write-up, client-facing docs.',
-    fields: [{ key: 'appliesTo', label: 'Applies to', kind: 'text', half: true, hint: 'System, client or product this covers' }],
-  },
-
-  howto: {
-    label: 'How-to / runbook',
-    plural: 'How-tos & runbooks',
-    monogram: 'HT',
-    tone: 'teal',
-    blurb: 'Repeatable procedure someone else has to follow without you in the room.',
-    stageLabel: 'Freshness',
-    stages: [
-      { key: 'unverified', label: 'Unverified', tone: 'gray' },
-      { key: 'verified', label: 'Verified', tone: 'green' },
-      { key: 'stale', label: 'Needs review', tone: 'amber' },
-    ],
-    fields: [
-      { key: 'prerequisites', label: 'Prerequisites', kind: 'markdown', hint: 'Access, tooling or approvals needed first' },
-      { key: 'steps', label: 'Steps', kind: 'markdown', required: true, hint: 'Numbered list — one action per step' },
-      { key: 'rollback', label: 'Rollback / if it goes wrong', kind: 'markdown' },
-      { key: 'recommendedWhen', label: 'Recommended when', kind: 'markdown', hint: 'The situation this is actually the right call' },
-      { key: 'avoidWhen', label: 'Avoid when', kind: 'markdown', hint: 'When to reach for something else instead' },
-      { key: 'limitations', label: 'Known limitations', kind: 'markdown' },
-      { key: 'timeEstimate', label: 'Typical time', kind: 'text', half: true },
-      { key: 'lastVerified', label: 'Last verified', kind: 'date', half: true },
-    ],
+    blurb: 'General knowledge, guides, explanations and best practices.',
+    fields: [],
   },
 
   research: {
-    label: 'Research / R&D',
-    plural: 'Research & R&D',
-    monogram: 'RD',
-    tone: 'violet',
-    blurb: 'What we investigated, how, what came out of it, and what we decided to do.',
+    label: 'Research',
+    plural: 'Research',
+    monogram: 'R',
+    tone: 'teal',
+    blurb: 'Technical investigation, experiments and findings.',
     stageLabel: 'Research status',
-    stages: [
-      { key: 'proposed', label: 'Proposed', tone: 'gray' },
-      { key: 'in_progress', label: 'In progress', tone: 'blue' },
-      { key: 'implemented', label: 'Implemented', tone: 'green' },
-      { key: 'rejected', label: 'Rejected', tone: 'red' },
-      { key: 'on_hold', label: 'On hold', tone: 'amber' },
-    ],
-    fields: [
-      { key: 'objective', label: 'Objective / hypothesis', kind: 'markdown', required: true },
-      { key: 'method', label: 'Method / approach', kind: 'markdown' },
-      { key: 'outcome', label: 'Outcome / findings', kind: 'markdown' },
-      { key: 'conclusion', label: 'Conclusion & next steps', kind: 'markdown' },
-      { key: 'period', label: 'Time period', kind: 'text', half: true, hint: 'e.g. Aug–Sep 2026' },
-      { key: 'collaborators', label: 'Collaborators', kind: 'list', half: true },
-      { key: 'effort', label: 'Effort spent', kind: 'text', half: true, hint: 'e.g. 6 person-days' },
-      { key: 'references', label: 'Reference links', kind: 'links', hint: 'One URL per line' },
-    ],
+    stages: RESEARCH_STAGES,
+    fields: RESEARCH_FIELDS,
   },
 
-  kt: {
-    label: 'Knowledge transfer',
-    plural: 'Knowledge transfers',
-    monogram: 'KT',
-    tone: 'amber',
-    blurb: 'Handover record: who handed what to whom, what is covered, what is still open.',
-    stageLabel: 'Handover status',
-    stages: [
-      { key: 'scheduled', label: 'Scheduled', tone: 'gray' },
-      { key: 'in_progress', label: 'In progress', tone: 'blue' },
-      { key: 'handed_over', label: 'Handed over', tone: 'teal' },
-      { key: 'verified', label: 'Verified by receiver', tone: 'green' },
-    ],
-    fields: [
-      { key: 'handoverFrom', label: 'Handed over by', kind: 'text', half: true, required: true },
-      { key: 'handoverTo', label: 'Handed over to', kind: 'list', half: true, required: true },
-      { key: 'system', label: 'System / project', kind: 'text', half: true },
-      { key: 'handoverDate', label: 'Handover date', kind: 'date', half: true },
-      { key: 'scope', label: 'What is covered', kind: 'markdown', hint: 'Components, environments, credentials location, deploy path' },
-      { key: 'notCovered', label: 'What is NOT covered', kind: 'markdown', hint: 'The part that bites people six months later' },
-      { key: 'openRisks', label: 'Open risks / known issues', kind: 'markdown' },
-      { key: 'contacts', label: 'Escalation contacts', kind: 'list' },
-      { key: 'sessionLinks', label: 'Recordings & session notes', kind: 'links' },
-    ],
+  ai_research: {
+    label: 'AI Research',
+    plural: 'AI Research',
+    monogram: 'AI',
+    tone: 'violet',
+    blurb: 'AI, ML and LLM research and experimentation.',
+    stageLabel: 'Research status',
+    stages: RESEARCH_STAGES,
+    fields: RESEARCH_FIELDS,
   },
 
   decision: {
-    label: 'Decision record',
-    plural: 'Decision records',
-    monogram: 'DR',
-    tone: 'blue',
-    blurb: 'An architectural or process decision, why it was made, and what it cost us.',
+    label: 'Decision',
+    plural: 'Decisions',
+    monogram: 'D',
+    tone: 'gray',
+    blurb: 'An important decision and the reasoning behind it.',
     stageLabel: 'Decision status',
     stages: [
       { key: 'proposed', label: 'Proposed', tone: 'gray' },
@@ -150,49 +128,34 @@ export const ENTRY_TYPES = {
     ],
   },
 
-  snippet: {
-    label: 'Code snippet / pattern',
-    plural: 'Snippets & patterns',
-    monogram: '{ }',
-    tone: 'gray',
-    blurb: 'Reusable code we keep re-typing, with the gotchas attached.',
+  solution: {
+    label: 'Solution',
+    plural: 'Solutions',
+    monogram: 'S',
+    tone: 'green',
+    blurb: 'A problem, its fix, and the proven pattern that solved it.',
     fields: [
-      {
-        key: 'language',
-        label: 'Language',
-        kind: 'select',
-        half: true,
-        options: ['TypeScript', 'JavaScript', 'C#', 'PowerShell', 'Python', 'KQL', 'Bash', 'JSON', 'YAML', 'SQL'],
-      },
-      { key: 'runtime', label: 'Runtime / version', kind: 'text', half: true, hint: 'e.g. SPFx 1.19, .NET 8' },
-      { key: 'code', label: 'Code', kind: 'code', required: true },
-      { key: 'usage', label: 'How to use it', kind: 'markdown' },
-      { key: 'gotchas', label: 'Gotchas', kind: 'markdown' },
+      { key: 'problem', label: 'Problem', kind: 'markdown', required: true, hint: 'What was going wrong?' },
+      { key: 'rootCause', label: 'Root cause', kind: 'markdown' },
+      { key: 'resolution', label: 'Solution', kind: 'markdown', required: true, hint: 'What fixed it?' },
+      { key: 'code', label: 'Code', kind: 'code' },
+      { key: 'verification', label: 'How we verified it worked', kind: 'markdown' },
       { key: 'recommendedWhen', label: 'Recommended when', kind: 'markdown' },
       { key: 'avoidWhen', label: 'Avoid when', kind: 'markdown', hint: 'When to reach for something else instead' },
     ],
   },
 
-  postmortem: {
-    label: 'Incident postmortem',
-    plural: 'Incident postmortems',
-    monogram: 'PM',
-    tone: 'red',
-    blurb: 'What broke, why, and what we changed so it does not happen twice.',
-    stageLabel: 'Incident status',
-    stages: [
-      { key: 'investigating', label: 'Investigating', tone: 'amber' },
-      { key: 'mitigated', label: 'Mitigated', tone: 'blue' },
-      { key: 'actions_open', label: 'Actions open', tone: 'violet' },
-      { key: 'closed', label: 'Closed', tone: 'green' },
-    ],
+  runbook: {
+    label: 'Runbook',
+    plural: 'Runbooks',
+    monogram: 'RB',
+    tone: 'amber',
+    blurb: 'A repeatable, step-by-step operational procedure.',
     fields: [
-      { key: 'severity', label: 'Severity', kind: 'select', half: true, options: ['Sev1 — outage', 'Sev2 — major', 'Sev3 — minor'] },
-      { key: 'incidentDate', label: 'Incident date', kind: 'date', half: true },
-      { key: 'impact', label: 'Impact', kind: 'markdown', required: true, hint: 'Who was affected, for how long' },
-      { key: 'timeline', label: 'Timeline', kind: 'markdown' },
-      { key: 'rootCause', label: 'Root cause', kind: 'markdown' },
-      { key: 'actionItems', label: 'Action items', kind: 'markdown' },
+      { key: 'prerequisites', label: 'Prerequisites', kind: 'markdown', hint: 'Access, tooling or approvals needed first' },
+      { key: 'steps', label: 'Steps', kind: 'markdown', required: true, hint: 'Numbered list — one action per step' },
+      { key: 'verification', label: 'How to verify it worked', kind: 'markdown' },
+      { key: 'rollback', label: 'Rollback / notes', kind: 'markdown' },
     ],
   },
 } satisfies Record<string, EntryTypeDef>
@@ -207,6 +170,16 @@ export const stagesFor = (key: EntryTypeKey): Stage[] => typeDef(key).stages ?? 
 
 export const stageFor = (key: EntryTypeKey, stage?: string): Stage | undefined =>
   stage ? stagesFor(key).find((s) => s.key === stage) : undefined
+
+/** "I did X" -> "use type Y" — the self-service decision helper shown in the create flow. */
+export const TYPE_DECISION_HELPER: { prompt: string; type: EntryTypeKey }[] = [
+  { prompt: 'I am explaining something', type: 'article' },
+  { prompt: 'I investigated or tested something', type: 'research' },
+  { prompt: 'I researched AI, ML or LLMs', type: 'ai_research' },
+  { prompt: 'I need to document why we chose something', type: 'decision' },
+  { prompt: 'I solved a specific problem', type: 'solution' },
+  { prompt: 'Someone needs to follow steps to perform a task', type: 'runbook' },
+]
 
 /** Technology / domain facet — the "is this an AI thing or an SPFx thing" axis. */
 export const TECH = [
