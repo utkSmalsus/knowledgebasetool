@@ -10,16 +10,14 @@ import {
   Monogram,
   Panel,
   SectionTitle,
-  StageChip,
-  StatusChip,
   Tag,
   TechChip,
-  VisibilityChip,
+  VerificationBadge,
   btn,
   fmtDate,
 } from '../components/ui'
 import { recommend } from '../kb/recommend'
-import { FieldDef, typeDef } from '../kb/schema'
+import { FieldDef, stageFor, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { canEdit } from '../types'
 
@@ -32,7 +30,7 @@ function DetailField({ def, value }: { def: FieldDef; value: string | string[] |
   if (def.kind === 'markdown') body = <Markdown source={value as string} />
   else if (def.kind === 'code')
     body = (
-      <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100">
+      <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-100 dark:bg-black">
         <code>{value as string}</code>
       </pre>
     )
@@ -54,8 +52,8 @@ function DetailField({ def, value }: { def: FieldDef; value: string | string[] |
 
   return (
     <div className={def.half ? '' : 'sm:col-span-2'}>
-      <div className="text-xs font-semibold uppercase text-slate-400">{def.label}</div>
-      <div className="mt-0.5">{body}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{def.label}</div>
+      <div className="mt-1">{body}</div>
     </div>
   )
 }
@@ -88,12 +86,13 @@ export default function EntryDetail() {
   const linkedRelated = visible.filter((e) => entry.relatedEntryIds.includes(e.id))
   const related = linkedRelated.length > 0 ? linkedRelated : recommend(visible, [entry], new Set([entry.id]), 4)
 
+  const stage = stageFor(entry.type, entry.stage)
   const mainFields = def.fields.filter((f) => !WHEN_TO_USE_KEYS.includes(f.key))
   const whenFields = def.fields.filter((f) => WHEN_TO_USE_KEYS.includes(f.key) && entry.details[f.key])
   const hasMainFields = mainFields.some((fd) => entry.details[fd.key] !== undefined && entry.details[fd.key] !== '')
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs text-slate-400">
         <Link to="/" className="hover:text-slate-600 dark:hover:text-slate-300">
@@ -107,62 +106,68 @@ export default function EntryDetail() {
         <span className="truncate text-slate-500 dark:text-slate-400">{entry.title}</span>
       </nav>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
-        <article className="animate-fade-up space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 gap-3">
-              <Monogram type={entry.type} />
-              <div className="min-w-0">
-                <div className="text-xs font-medium text-slate-500">{def.label}</div>
-                <h1 className="text-xl font-bold leading-snug tracking-tight">{entry.title}</h1>
-                {entry.summary && <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{entry.summary}</p>}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_280px]">
+        {/* ---------------- reading column (document, not a card) ---------------- */}
+        <article className="animate-fade-up min-w-0 max-w-3xl space-y-6">
+          <header className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3">
+                <Monogram type={entry.type} />
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-slate-500">{def.label}</div>
+                  <h1 className="text-2xl font-bold leading-tight tracking-tight">{entry.title}</h1>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <button
+                  onClick={() => toggleSaved(entry.id)}
+                  title={isSaved(entry.id) ? 'Remove from saved' : 'Save for later'}
+                  className={btn.ghost}
+                >
+                  {isSaved(entry.id) ? '★ Saved' : '☆ Save'}
+                </button>
+                {manage && (
+                  <>
+                    <Link to={`/edit/${entry.id}`} className={btn.ghost}>
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${entry.title}"? This cannot be undone.`)) {
+                          remove(entry.id)
+                          navigate('/browse')
+                        }
+                      }}
+                      className={btn.danger}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 sm:shrink-0">
-              <button
-                onClick={() => toggleSaved(entry.id)}
-                title={isSaved(entry.id) ? 'Remove from saved' : 'Save for later'}
-                className={btn.ghost}
-              >
-                {isSaved(entry.id) ? '★ Saved' : '☆ Save'}
-              </button>
-              {manage && (
-                <>
-                  <Link to={`/edit/${entry.id}`} className={btn.ghost}>
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete "${entry.title}"? This cannot be undone.`)) {
-                        remove(entry.id)
-                        navigate('/browse')
-                      }
-                    }}
-                    className={btn.danger}
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <StageChip type={entry.type} stage={entry.stage} />
-            <StatusChip status={entry.status} />
-            <VisibilityChip visibility={entry.visibility} />
-            {entry.tech.map((t) => (
-              <TechChip key={t} k={t} to={`/browse?tech=${t}`} />
-            ))}
-            {entry.tags.map((t) => (
-              <Tag key={t} name={t} to={`/browse?tag=${t}`} />
-            ))}
-          </div>
+            {entry.summary && <p className="text-base text-slate-600 dark:text-slate-400">{entry.summary}</p>}
+
+            {/* the one strong trust indicator — deeper detail lives in the sidebar panel */}
+            <VerificationBadge entry={entry} />
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {entry.tech.map((t) => (
+                <TechChip key={t} k={t} to={`/browse?tech=${t}`} />
+              ))}
+              {entry.tags.map((t) => (
+                <Tag key={t} name={t} to={`/browse?tag=${t}`} />
+              ))}
+            </div>
+          </header>
+
+          <div className="h-px bg-slate-100 dark:bg-slate-800" />
 
           <Markdown source={entry.content} />
 
           {hasMainFields && (
-            <div className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-950">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               {mainFields.map((fd) => (
                 <DetailField key={fd.key} def={fd} value={entry.details[fd.key]} />
               ))}
@@ -170,13 +175,13 @@ export default function EntryDetail() {
           )}
 
           {whenFields.length > 0 && (
-            <div>
-              <SectionTitle className="mb-2">When (not) to use this</SectionTitle>
-              <div className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+            <section>
+              <SectionTitle className="mb-3">When (not) to use this</SectionTitle>
+              <div className="space-y-4">
                 {whenFields.map((fd) => (
                   <div key={fd.key}>
                     <div
-                      className={`text-xs font-semibold uppercase ${
+                      className={`text-xs font-semibold uppercase tracking-wide ${
                         fd.key === 'recommendedWhen'
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : fd.key === 'avoidWhen'
@@ -193,46 +198,41 @@ export default function EntryDetail() {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          <div>
-            <SectionTitle className="mb-2">Evidence</SectionTitle>
-            {entry.evidence.length > 0 ? (
+          {(entry.evidence.length > 0 || entry.attachments.length > 0) && (
+            <section>
+              <SectionTitle className="mb-3">Evidence &amp; attachments</SectionTitle>
               <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {entry.evidence.map((e) => (
                   <EvidenceRow key={e.id} e={e} />
                 ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400">No evidence attached yet.</p>
-            )}
-          </div>
-
-          {entry.attachments.length > 0 && (
-            <div>
-              <SectionTitle className="mb-2">Attachments</SectionTitle>
-              <ul className="space-y-1">
                 {entry.attachments.map((a) => (
-                  <li key={a.id} className="text-sm">
-                    <a href={a.url} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline dark:text-sky-400">
-                      📎 {a.name}
-                    </a>
-                    {a.note && <span className="ml-2 text-xs text-slate-400">{a.note}</span>}
-                  </li>
+                  <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-800/60"
+                  >
+                    <span aria-hidden>📎</span>
+                    <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">{a.name}</span>
+                    {a.note && <span className="shrink-0 text-xs text-slate-400">{a.note}</span>}
+                  </a>
                 ))}
-              </ul>
-            </div>
+              </div>
+            </section>
           )}
 
           <FeedbackWidget entryId={entry.id} feedback={entry.feedback} />
 
           {manage && (
-            <div>
-              <SectionTitle className="mb-2">Internal discussion</SectionTitle>
+            <section>
+              <SectionTitle className="mb-3">Internal discussion</SectionTitle>
               <ul className="space-y-2">
                 {entry.comments.map((c) => (
-                  <li key={c.id} className="rounded-lg bg-slate-50 p-2.5 text-sm dark:bg-slate-950">
+                  <li key={c.id} className="rounded-lg bg-slate-50 p-2.5 text-sm dark:bg-slate-900">
                     <span className="font-medium">{c.author}</span>{' '}
                     <span className="text-xs text-slate-400">{fmtDate(c.createdAt)}</span>
                     <div className="mt-0.5">{c.body}</div>
@@ -259,15 +259,19 @@ export default function EntryDetail() {
                   Post
                 </button>
               </form>
-            </div>
+            </section>
           )}
         </article>
 
+        {/* ---------------- context rail ---------------- */}
         <aside className="space-y-4">
           <VerificationPanel entry={entry} canManage={manage} />
 
           <Panel title="Details">
             <dl className="space-y-2 p-4 text-sm">
+              <Row label="Status" value={entry.status === 'draft' ? 'Draft' : entry.status === 'archived' ? 'Archived' : 'Published'} />
+              <Row label="Visibility" value={entry.visibility === 'client' ? 'Client-visible' : 'Internal only'} />
+              {stage && <Row label={def.stageLabel ?? 'Stage'} value={stage.label} />}
               <Row label="Category" value={categoryName(entry.category)} />
               {entry.portfolio && (
                 <Row label="Portfolio" value={entry.portfolio} to={`/browse?portfolio=${encodeURIComponent(entry.portfolio)}`} />
@@ -275,7 +279,6 @@ export default function EntryDetail() {
               {entry.project && <Row label="Project" value={entry.project} to={`/browse?project=${encodeURIComponent(entry.project)}`} />}
               <Row label="Author" value={entry.author} />
               {entry.reviewer && <Row label="Reviewer" value={entry.reviewer} />}
-              <Row label="Created" value={fmtDate(entry.createdAt)} />
               <Row label="Updated" value={fmtDate(entry.updatedAt)} />
               <Row label="Views" value={String(entry.views)} />
             </dl>

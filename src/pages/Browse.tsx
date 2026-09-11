@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import EntryCard from '../components/EntryCard'
 import { Empty, Monogram, Pill, input } from '../components/ui'
@@ -58,6 +58,10 @@ export default function Browse() {
   const { visible, categories, portfolios, currentUser } = useKb()
   const [f, patch] = useUrlFilters(fixedType)
   const internal = isInternal(currentUser.role)
+  // starts open if a link already carries one of these filters, so it's never silently hiding an active choice
+  const [moreOpen, setMoreOpen] = useState(
+    () => !!(f.category || f.portfolio || f.project || f.status || f.visibility || f.tag || f.author),
+  )
 
   const results = useMemo(() => applyFilters(visible, f, categories), [visible, f, categories])
 
@@ -131,88 +135,103 @@ export default function Browse() {
           </div>
         </FacetGroup>
 
-        <FacetGroup label="Category">
-          <select value={f.category} onChange={(e) => patch({ category: e.target.value })} className={input}>
-            <option value="">All</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.parentId ? `— ${c.name}` : c.name}
-              </option>
-            ))}
-          </select>
-        </FacetGroup>
-
-        <FacetGroup label="Portfolio">
-          <select value={f.portfolio} onChange={(e) => patch({ portfolio: e.target.value })} className={input}>
-            <option value="">All</option>
-            {portfolios.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </FacetGroup>
-
-        <FacetGroup label="Project">
-          <select value={f.project} onChange={(e) => patch({ project: e.target.value })} className={input}>
-            <option value="">All</option>
-            {allProjects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </FacetGroup>
-
-        <FacetGroup label="Status">
-          <select value={f.status} onChange={(e) => patch({ status: e.target.value })} className={input}>
-            <option value="">All</option>
-            {ENTRY_STATUSES.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </FacetGroup>
-
-        {internal && (
-          <FacetGroup label="Visibility">
-            <select value={f.visibility} onChange={(e) => patch({ visibility: e.target.value })} className={input}>
-              <option value="">All</option>
-              <option value="internal">Internal only</option>
-              <option value="client">Client-visible</option>
-            </select>
-          </FacetGroup>
-        )}
-
-        <FacetGroup label="Tag">
-          <select value={f.tag} onChange={(e) => patch({ tag: e.target.value })} className={input}>
-            <option value="">All</option>
-            {allTags.map((t) => (
-              <option key={t} value={t}>
-                #{t}
-              </option>
-            ))}
-          </select>
-        </FacetGroup>
-
-        {internal && (
-          <FacetGroup label="Author">
-            <select value={f.author} onChange={(e) => patch({ author: e.target.value })} className={input}>
-              <option value="">All</option>
-              {allAuthors.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </FacetGroup>
-        )}
-
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input type="checkbox" checked={f.verifiedOnly} onChange={(e) => patch({ verifiedOnly: e.target.checked })} />
           Verified only
         </label>
+
+        {/* progressive disclosure — most people never need these, so they start collapsed */}
+        <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+          <button
+            onClick={() => setMoreOpen((o) => !o)}
+            className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          >
+            More filters
+            <span aria-hidden>{moreOpen ? '−' : '+'}</span>
+          </button>
+
+          {moreOpen && (
+            <div className="mt-4 space-y-5">
+              <FacetGroup label="Category">
+                <select value={f.category} onChange={(e) => patch({ category: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.parentId ? `— ${c.name}` : c.name}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
+              <FacetGroup label="Portfolio">
+                <select value={f.portfolio} onChange={(e) => patch({ portfolio: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {portfolios.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
+              <FacetGroup label="Project">
+                <select value={f.project} onChange={(e) => patch({ project: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {allProjects.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
+              <FacetGroup label="Status">
+                <select value={f.status} onChange={(e) => patch({ status: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {ENTRY_STATUSES.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
+              {internal && (
+                <FacetGroup label="Visibility">
+                  <select value={f.visibility} onChange={(e) => patch({ visibility: e.target.value })} className={input}>
+                    <option value="">All</option>
+                    <option value="internal">Internal only</option>
+                    <option value="client">Client-visible</option>
+                  </select>
+                </FacetGroup>
+              )}
+
+              <FacetGroup label="Tag">
+                <select value={f.tag} onChange={(e) => patch({ tag: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {allTags.map((t) => (
+                    <option key={t} value={t}>
+                      #{t}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
+              {internal && (
+                <FacetGroup label="Author">
+                  <select value={f.author} onChange={(e) => patch({ author: e.target.value })} className={input}>
+                    <option value="">All</option>
+                    {allAuthors.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
+                </FacetGroup>
+              )}
+            </div>
+          )}
+        </div>
       </aside>
 
       <section className="space-y-4">
@@ -240,7 +259,18 @@ export default function Browse() {
           {results.length === 0 && (
             <Empty
               title="We couldn't find anything matching that"
-              hint={f.q ? `Try a broader term, or clear a filter.` : 'Try clearing a filter or broadening your search.'}
+              hint={activeCount > 0 ? 'Try clearing a filter or broadening your search.' : 'Try a broader or different term.'}
+              action={
+                allTags.length > 0 ? (
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {allTags.slice(0, 6).map((t) => (
+                      <button key={t} onClick={() => patch({ q: '', tag: t })}>
+                        <Pill t="gray">#{t}</Pill>
+                      </button>
+                    ))}
+                  </div>
+                ) : undefined
+              }
             />
           )}
           {results.map((e) => (

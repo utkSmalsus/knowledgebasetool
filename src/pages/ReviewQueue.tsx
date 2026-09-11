@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ReviewDialog } from '../components/ReviewActions'
-import { Empty, Monogram, PageTitle, Panel, StageChip, VerificationBadge, btn, fmtDate } from '../components/ui'
+import { Empty, Monogram, PageTitle, Panel, VerificationBadge, btn, fmtDate } from '../components/ui'
 import { typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 
@@ -52,7 +52,6 @@ export default function ReviewQueue() {
                       )}
                     </div>
                   </div>
-                  <StageChip type={e.type} stage={e.stage} />
                   <VerificationBadge entry={e} size="sm" />
                   <button onClick={() => setReviewing(e.id)} className={btn.primary}>
                     Review

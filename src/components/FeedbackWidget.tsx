@@ -63,7 +63,7 @@ export default function FeedbackWidget({ entryId, feedback }: { entryId: string;
             ✓ Yes
           </button>
           <button onClick={() => submit('partial')} className={btn.ghost}>
-            ⚠ Partially
+            ⚠ Mostly
           </button>
           <button onClick={() => submit('no')} className={btn.ghost}>
             ✕ No

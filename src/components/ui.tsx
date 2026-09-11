@@ -234,7 +234,7 @@ export function Markdown({ source, className = '' }: { source?: string; classNam
   if (!source?.trim()) return null
   return (
     <div
-      className={`prose prose-slate max-w-none prose-sm dark:prose-invert prose-headings:font-semibold prose-pre:bg-slate-900 prose-pre:text-slate-100 ${className}`}
+      className={`prose prose-slate max-w-none prose-sm dark:prose-invert prose-headings:font-semibold prose-pre:bg-slate-950 prose-pre:text-slate-100 dark:prose-pre:bg-black/40 dark:prose-pre:ring-1 dark:prose-pre:ring-slate-800 ${className}`}
       dangerouslySetInnerHTML={{ __html: renderMarkdown(source) }}
     />
   )

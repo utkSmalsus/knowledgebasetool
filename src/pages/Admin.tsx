@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { computeHealth } from '../kb/health'
+import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { Category, isExpired } from '../types'
-import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input } from '../components/ui'
+import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input, tone } from '../components/ui'
 
 export default function Admin() {
   const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, resetToSeed } = useKb()
@@ -28,7 +29,9 @@ export default function Admin() {
   }
 
   const health = computeHealth(entries)
-  const outdated = entries.filter((e) => e.verification.state === 'needs_update' || isExpired(e.verification)).sort((a, b) => b.views - a.views)
+  const outdated = entries
+    .filter((e) => e.verification.state === 'needs_update' || isExpired(e.verification) || e.feedback.some((f) => f.verdict === 'no'))
+    .sort((a, b) => b.views - a.views)
 
   const contributors = Array.from(new Set(entries.map((e) => e.author)))
     .map((name) => {
@@ -37,6 +40,10 @@ export default function Admin() {
       return { name, count: authored.length, activeRecently }
     })
     .sort((a, b) => b.count - a.count)
+
+  const byType = ENTRY_TYPE_KEYS.map((k) => ({ key: k, n: entries.filter((e) => e.type === k).length }))
+  const maxType = Math.max(1, ...byType.map((t) => t.n))
+  const noOwner = entries.filter((e) => !e.reviewer && e.verification.state !== 'verified')
 
   const mostViewed = [...entries].sort((a, b) => b.views - a.views).slice(0, 5)
   const mostUseful = entries
@@ -64,13 +71,14 @@ export default function Admin() {
       <section className="space-y-4">
         <SectionTitle>Knowledge health</SectionTitle>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-7">
           <Stat label="Total" value={health.total} />
           <Stat label="Verified" value={health.verified} tone="emerald" />
           <Stat label="Under review" value={health.underReview} tone="sky" />
           <Stat label="Needs update" value={health.needsUpdate} tone="amber" />
           <Stat label="Expired" value={health.expired} tone="amber" />
           <Stat label="Drafts" value={health.drafts} />
+          <Stat label="No reviewer" value={noOwner.length} tone={noOwner.length > 0 ? 'amber' : undefined} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
@@ -108,7 +116,7 @@ export default function Admin() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Outdated knowledge" hint="Needs update, or past its scheduled review date">
+          <Panel title="Outdated knowledge" hint="Needs update, past its review date, or reported inaccurate">
             {outdated.length === 0 ? (
               <p className="p-4 text-sm text-slate-400">Nothing outdated right now.</p>
             ) : (
@@ -135,6 +143,48 @@ export default function Admin() {
                 </li>
               ))}
             </ul>
+          </Panel>
+
+          <Panel title="Knowledge by type" hint="Which areas have the most knowledge">
+            <ul className="space-y-2.5 p-4">
+              {byType.map(({ key, n }) => {
+                const def = typeDef(key)
+                return (
+                  <li key={key}>
+                    <Link to={`/type/${key}`} className="group block">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium group-hover:underline">{def.label}</span>
+                        <span className="tabular-nums text-slate-500">{n}</span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${tone[def.tone].solid}`}
+                          style={{ width: `${Math.round((n / maxType) * 100)}%` }}
+                        />
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </Panel>
+
+          <Panel title="No reviewer assigned" hint="Not yet verified, and nobody is on the hook to check it">
+            {noOwner.length === 0 ? (
+              <p className="p-4 text-sm text-slate-400">Every unverified entry has a reviewer assigned.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {noOwner.slice(0, 6).map((e) => (
+                  <li key={e.id} className="flex items-center gap-2 px-4 py-2.5">
+                    <Monogram type={e.type} size="sm" />
+                    <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                      {e.title}
+                    </Link>
+                    <span className="shrink-0 text-xs text-slate-400">{e.author}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
 
           <Panel title="Most viewed">

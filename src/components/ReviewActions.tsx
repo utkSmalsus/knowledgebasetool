@@ -2,16 +2,20 @@ import { useState } from 'react'
 import { useKb } from '../kb/store'
 import { REVIEW_INTERVALS, VerificationChecks } from '../types'
 import { useToast } from './Toast'
-import { Modal, btn, input } from './ui'
+import { EvidenceRow, Modal, btn, fmtDate, input } from './ui'
 
 const emptyChecks: VerificationChecks = { contentReviewed: false, evidenceChecked: false, approachValidated: false }
+
+const approveBtn =
+  'inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40'
 
 /**
  * The Approve / Request changes / Reject dialog. Shared by the entry detail
  * page and the review queue so the workflow behaves identically everywhere.
  */
 export function ReviewDialog({ entryId, title, open, onClose }: { entryId: string; title: string; open: boolean; onClose: () => void }) {
-  const { approve, requestChanges, reject } = useKb()
+  const { approve, requestChanges, reject, entries } = useKb()
+  const entry = entries.find((e) => e.id === entryId)
   const toast = useToast()
   const [mode, setMode] = useState<'approve' | 'changes' | 'reject'>('approve')
   const [checks, setChecks] = useState<VerificationChecks>(emptyChecks)
@@ -50,7 +54,21 @@ export function ReviewDialog({ entryId, title, open, onClose }: { entryId: strin
         <h2 id="review-title" className="text-base font-semibold">
           Review &ldquo;{title}&rdquo;
         </h2>
+        {entry && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            By {entry.author} · submitted {entry.verification.submittedAt ? fmtDate(entry.verification.submittedAt) : '—'} ·{' '}
+            {entry.evidence.length} evidence item{entry.evidence.length === 1 ? '' : 's'}
+          </p>
+        )}
       </div>
+
+      {entry && entry.evidence.length > 0 && (
+        <div className="space-y-1.5 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+          {entry.evidence.slice(0, 3).map((e) => (
+            <EvidenceRow key={e.id} e={e} />
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-slate-200 px-5 pt-3 dark:border-slate-800">
         {(
@@ -137,7 +155,7 @@ export function ReviewDialog({ entryId, title, open, onClose }: { entryId: strin
         <button
           onClick={submit}
           disabled={mode !== 'approve' && !note.trim()}
-          className={mode === 'reject' ? btn.danger : btn.primary}
+          className={mode === 'reject' ? btn.danger : mode === 'approve' ? approveBtn : btn.primary}
         >
           {mode === 'approve' ? 'Submit review' : mode === 'changes' ? 'Request changes' : 'Reject'}
         </button>

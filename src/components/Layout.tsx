@@ -88,6 +88,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <NavLink to="/" end className={navCls} onClick={() => setMobileNavOpen(false)}>
           Overview
         </NavLink>
+        <NavLink to="/browse" className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Explore
+        </NavLink>
+        <NavLink to="/saved" className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Saved &amp; recent
+        </NavLink>
+        <NavLink to="/experts" className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Experts
+        </NavLink>
+        {canReview(currentUser.role) && (
+          <NavLink to="/review" className={navCls} onClick={() => setMobileNavOpen(false)}>
+            Review queue
+          </NavLink>
+        )}
+
+        <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
 
         {counts.map(({ key, n }) => {
           const t = typeDef(key)
@@ -102,20 +118,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )
         })}
 
-        <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
-
-        <NavLink to="/saved" className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Saved &amp; recent
-        </NavLink>
-        <NavLink to="/experts" className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Experts
-        </NavLink>
-        {canReview(currentUser.role) && (
-          <NavLink to="/review" className={navCls} onClick={() => setMobileNavOpen(false)}>
-            Review queue
-          </NavLink>
-        )}
-
         {currentUser.role === 'admin' && (
           <>
             <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
@@ -126,21 +128,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       </nav>
 
-      <div className="mt-auto space-y-1.5 border-t border-slate-200 p-4 dark:border-slate-800">
-        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Preview as role</label>
+      {/* Demo-only account switcher — deliberately styled as a dev facility, never a real feature. */}
+      <div className="mt-auto space-y-2 border-t border-dashed border-amber-300/70 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+          <span aria-hidden>🛠</span> Preview mode
+        </div>
         <select
           value={currentUser.role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className={`${input} text-xs`}
-          title="Demo only — real deployments read this from the session"
+          className={`${input} border-amber-300 bg-white text-xs dark:border-amber-900/60 dark:bg-slate-950`}
+          title="Demo only — a real deployment reads this from the signed-in session, not a dropdown"
         >
           <option value="admin">Admin — Utkarsh</option>
           <option value="editor">Editor — Priya</option>
           <option value="viewer">Viewer — Jonas</option>
           <option value="client">Client — Müller AG</option>
         </select>
-        <p className="text-[11px] leading-snug text-slate-400">
-          Switch to <span className="font-medium">Client</span> to see exactly what an external account can reach.
+        <p className="text-[11px] leading-snug text-amber-800/80 dark:text-amber-200/70">
+          Not a real account switcher — lets you preview what each role sees.
         </p>
       </div>
     </>
@@ -177,10 +182,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className={`${input} flex max-w-xl flex-1 cursor-text items-center justify-between text-left text-slate-400`}
+            className={`${input} flex min-w-0 max-w-xl flex-1 cursor-text items-center justify-between gap-2 text-left text-slate-400`}
           >
             <span className="truncate">Search knowledge, ask a question, or find an expert…</span>
-            <Kbd>{isMac ? '⌘' : 'Ctrl'} K</Kbd>
+            <span className="hidden shrink-0 sm:block">
+              <Kbd>{isMac ? '⌘' : 'Ctrl'} K</Kbd>
+            </span>
           </button>
 
           <div className="relative" ref={noticesRef}>
@@ -227,7 +234,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <button onClick={() => setDark((d) => !d)} className={btn.ghost} title="Toggle dark mode">
-            {dark ? 'Light' : 'Dark'}
+            <span aria-hidden>{dark ? '☀' : '☾'}</span>
+            <span className="hidden sm:inline">{dark ? 'Light' : 'Dark'}</span>
           </button>
 
           {canEdit(currentUser.role) && (

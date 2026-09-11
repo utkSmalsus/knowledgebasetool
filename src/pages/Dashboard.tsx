@@ -3,11 +3,9 @@ import { Link } from 'react-router-dom'
 import EntryCard from '../components/EntryCard'
 import {
   Empty,
-  Eyebrow,
   Monogram,
   PageTitle,
   Panel,
-  Pill,
   SectionTitle,
   StatusChip,
   VerificationBadge,
@@ -18,7 +16,7 @@ import {
 import { needsAttention } from '../kb/attention'
 import { recommend } from '../kb/recommend'
 import { firstNameOf } from '../kb/recommend'
-import { ENTRY_TYPE_KEYS, TECH, typeDef } from '../kb/schema'
+import { typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { Entry, canEdit, isExpired, isInternal } from '../types'
 import { useState } from 'react'
@@ -36,12 +34,6 @@ export default function Dashboard() {
   const [heroQuery, setHeroQuery] = useState('')
   const internal = isInternal(currentUser.role)
   const isContributor = canEdit(currentUser.role)
-
-  const byType = ENTRY_TYPE_KEYS.map((k) => ({ key: k, n: visible.filter((e) => e.type === k).length }))
-  const maxType = Math.max(1, ...byType.map((t) => t.n))
-  const byTech = TECH.map((t) => ({ ...t, n: visible.filter((e) => e.tech.includes(t.key)).length }))
-    .filter((t) => t.n > 0)
-    .sort((a, b) => b.n - a.n)
 
   const recent = [...visible].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6)
   const popular = [...visible].sort((a, b) => b.views - a.views).slice(0, 5)
@@ -207,58 +199,20 @@ export default function Dashboard() {
           </div>
         </Panel>
 
-        <div className="space-y-6">
-          <Panel title="Knowledge by type">
-            <ul className="space-y-2 p-4">
-              {byType.map(({ key, n }) => {
-                const def = typeDef(key)
-                return (
-                  <li key={key}>
-                    <Link to={`/type/${key}`} className="group block">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium group-hover:underline">{def.label}</span>
-                        <span className="tabular-nums text-slate-500">{n}</span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${tone[def.tone].solid}`}
-                          style={{ width: `${Math.round((n / maxType) * 100)}%` }}
-                        />
-                      </div>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </Panel>
-
-          <Panel title="By technology" hint="The axis you actually search on">
-            <div className="flex flex-wrap gap-1.5 p-4">
-              {byTech.map((t) => (
-                <Link key={t.key} to={`/browse?tech=${t.key}`}>
-                  <Pill t="gray">
-                    {t.label} <span className="tabular-nums opacity-60">{t.n}</span>
-                  </Pill>
+        <Panel title="Most read">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {popular.map((e) => (
+              <li key={e.id} className="flex items-center gap-2 px-4 py-2">
+                <Monogram type={e.type} size="sm" />
+                <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                  {e.title}
                 </Link>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Most read">
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-              {popular.map((e) => (
-                <li key={e.id} className="flex items-center gap-2 px-4 py-2">
-                  <Monogram type={e.type} size="sm" />
-                  <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
-                    {e.title}
-                  </Link>
-                  <VerificationBadge entry={e} size="sm" />
-                  <span className="shrink-0 text-xs tabular-nums text-slate-400">{e.views}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        </div>
+                <VerificationBadge entry={e} size="sm" />
+                <span className="shrink-0 text-xs tabular-nums text-slate-400">{e.views}</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
       </div>
     </div>
   )

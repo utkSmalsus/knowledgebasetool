@@ -264,7 +264,7 @@ export default function EntryForm() {
               <textarea value={form.content} onChange={(e) => set('content', e.target.value)} rows={6} className={input} />
             </Field>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Category">
                 <select value={form.category} onChange={(e) => set('category', e.target.value)} className={input}>
                   {categories.map((c) => (
@@ -279,7 +279,7 @@ export default function EntryForm() {
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Portfolio">
                 <select value={form.portfolio ?? ''} onChange={(e) => set('portfolio', e.target.value || undefined)} className={input}>
                   <option value="">—</option>
@@ -415,7 +415,7 @@ export default function EntryForm() {
 
         {step === 5 && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Status">
                 <select value={form.status} onChange={(e) => set('status', e.target.value as EntryStatus)} className={input}>
                   {ENTRY_STATUSES.map((s) => (

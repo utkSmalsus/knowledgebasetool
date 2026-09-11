@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useKb } from '../kb/store'
+import { VERIFICATION_META } from '../kb/schema'
 import { Entry, canReview, isExpired } from '../types'
 import { ReviewDialog } from './ReviewActions'
 import { useToast } from './Toast'
-import { Panel, VerificationBadge, btn, fmtDate, reviewDueLabel } from './ui'
+import { Panel, btn, fmtDate, reviewDueLabel } from './ui'
 
 export default function VerificationPanel({ entry, canManage }: { entry: Entry; canManage: boolean }) {
   const { currentUser, submitForReview } = useKb()
@@ -14,19 +15,37 @@ export default function VerificationPanel({ entry, canManage }: { entry: Entry; 
   const iAmReviewer = canReview(currentUser.role)
   const isOwner = entry.author === currentUser.name || currentUser.role === 'admin'
   const recentHistory = [...v.history].reverse().slice(0, 3)
+  const checkCount = v.checks ? Number(v.checks.contentReviewed) + Number(v.checks.evidenceChecked) + Number(v.checks.approachValidated) : 0
 
   const submit = () => {
     submitForReview(entry.id, entry.reviewer)
     toast('Submitted for review.', 'success')
   }
 
-  return (
-    <Panel title="Verification">
-      <div className="space-y-3 p-4 text-sm">
-        <VerificationBadge entry={entry} />
+  const meta = VERIFICATION_META[expired ? 'needs_update' : v.state]
 
+  return (
+    // The big trust badge already sits at the top of the article — this panel is the "why", not a second badge.
+    <Panel title={`Verification — ${expired ? 'Verification expired' : meta.label}`} hint={meta.description}>
+      <div className="space-y-3 p-4 text-sm">
         {(v.state === 'verified' || v.state === 'partially_verified') && (
           <dl className="space-y-1.5 text-xs">
+            {v.checks && (
+              <div className="pb-1.5">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="font-medium text-slate-600 dark:text-slate-300">{checkCount}/3 checks complete</span>
+                </div>
+                <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${checkCount === 3 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                    style={{ width: `${(checkCount / 3) * 100}%` }}
+                  />
+                </div>
+                <CheckLine label="Content reviewed" ok={v.checks.contentReviewed} />
+                <CheckLine label="Evidence checked" ok={v.checks.evidenceChecked} />
+                <CheckLine label="Technical approach validated" ok={v.checks.approachValidated} />
+              </div>
+            )}
             <Row label="Verified by" value={v.verifiedBy} />
             <Row label="Last verified" value={v.verifiedAt ? fmtDate(v.verifiedAt) : undefined} />
             <Row
@@ -34,13 +53,6 @@ export default function VerificationPanel({ entry, canManage }: { entry: Entry; 
               value={v.nextReviewAt ? `${fmtDate(v.nextReviewAt)} (${reviewDueLabel(v.nextReviewAt)})` : 'No scheduled re-review'}
               warn={expired}
             />
-            {v.checks && (
-              <div className="pt-1.5">
-                <CheckLine label="Content reviewed" ok={v.checks.contentReviewed} />
-                <CheckLine label="Evidence checked" ok={v.checks.evidenceChecked} />
-                <CheckLine label="Technical approach validated" ok={v.checks.approachValidated} />
-              </div>
-            )}
           </dl>
         )}
 
@@ -50,11 +62,17 @@ export default function VerificationPanel({ entry, canManage }: { entry: Entry; 
           </div>
         )}
 
-        {v.state === 'unverified' && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-            ⚠ This knowledge has not been verified yet.
-          </div>
-        )}
+        {v.state === 'unverified' &&
+          (recentHistory[0]?.action === 'changes_requested' || recentHistory[0]?.action === 'rejected' ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+              <span className="font-medium">{recentHistory[0].by}</span> {recentHistory[0].action === 'rejected' ? 'rejected this' : 'requested changes'}
+              {recentHistory[0].note && <> — &ldquo;{recentHistory[0].note}&rdquo;</>}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+              ⚠ This knowledge has not been verified yet.
+            </div>
+          ))}
 
         {v.state === 'in_review' && (
           <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
@@ -91,6 +109,7 @@ export default function VerificationPanel({ entry, canManage }: { entry: Entry; 
                 <li key={h.id}>
                   <span className="font-medium text-slate-700 dark:text-slate-300">{h.by}</span> {actionVerb(h.action)}{' '}
                   <span className="text-slate-400">{fmtDate(h.at)}</span>
+                  {h.note && <div className="mt-0.5 text-slate-500 dark:text-slate-400">&ldquo;{h.note}&rdquo;</div>}
                 </li>
               ))}
             </ul>
