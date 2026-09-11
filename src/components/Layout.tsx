@@ -1,17 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
+import { deriveNotifications } from '../kb/notifications'
 import { useKb } from '../kb/store'
-import { Role, canEdit } from '../types'
-import { btn, input, tone } from './ui'
+import { Role, canEdit, canReview } from '../types'
+import CommandPalette from './CommandPalette'
+import { Kbd, btn, input, tone } from './ui'
 
 const DARK_KEY = 'hochhuth-kb.dark'
+const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, setRole, visible } = useKb()
+  const { currentUser, setRole, visible, isNoticeRead, markNoticeRead } = useKb()
   const navigate = useNavigate()
-  const [q, setQ] = useState('')
-  const searchRef = useRef<HTMLInputElement>(null)
+  const location = useLocation()
+
+  // SPA navigation doesn't reset scroll on its own — every page should open at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [noticesOpen, setNoticesOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const noticesRef = useRef<HTMLDivElement>(null)
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem(DARK_KEY) === '1'
@@ -29,17 +40,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [dark])
 
-  // cmd/ctrl+K focuses search — the one shortcut people expect from a KB
+  // cmd/ctrl+K opens the command palette — the core of how this product wants to be used
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        searchRef.current?.focus()
+        setPaletteOpen((o) => !o)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (noticesRef.current && !noticesRef.current.contains(e.target as Node)) setNoticesOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const notices = useMemo(() => deriveNotifications(visible, currentUser), [visible, currentUser])
+  const unread = notices.filter((n) => !isNoticeRead(n.id))
 
   const counts = ENTRY_TYPE_KEYS.map((k) => ({ key: k, n: visible.filter((e) => e.type === k).length }))
 
@@ -50,88 +72,159 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
     }`
 
+  const NavContent = (
+    <>
+      <Link to="/" className="flex items-center gap-2.5 px-4 py-4" onClick={() => setMobileNavOpen(false)}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-slate-900 to-slate-700 text-xs font-bold text-white dark:from-slate-100 dark:to-white dark:text-slate-900">
+          HC
+        </span>
+        <span className="text-sm font-semibold leading-tight">
+          Hochhuth
+          <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">Knowledge Hub</span>
+        </span>
+      </Link>
+
+      <nav className="space-y-0.5 px-3">
+        <NavLink to="/" end className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Overview
+        </NavLink>
+
+        {counts.map(({ key, n }) => {
+          const t = typeDef(key)
+          return (
+            <NavLink key={key} to={`/type/${key}`} className={navCls} onClick={() => setMobileNavOpen(false)}>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone[t.tone].solid}`} />
+                <span className="truncate">{t.label}</span>
+              </span>
+              <span className="tabular-nums text-xs text-slate-400">{n}</span>
+            </NavLink>
+          )
+        })}
+
+        <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
+
+        <NavLink to="/saved" className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Saved &amp; recent
+        </NavLink>
+        <NavLink to="/experts" className={navCls} onClick={() => setMobileNavOpen(false)}>
+          Experts
+        </NavLink>
+        {canReview(currentUser.role) && (
+          <NavLink to="/review" className={navCls} onClick={() => setMobileNavOpen(false)}>
+            Review queue
+          </NavLink>
+        )}
+
+        {currentUser.role === 'admin' && (
+          <>
+            <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
+            <NavLink to="/admin" className={navCls} onClick={() => setMobileNavOpen(false)}>
+              Admin
+            </NavLink>
+          </>
+        )}
+      </nav>
+
+      <div className="mt-auto space-y-1.5 border-t border-slate-200 p-4 dark:border-slate-800">
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Preview as role</label>
+        <select
+          value={currentUser.role}
+          onChange={(e) => setRole(e.target.value as Role)}
+          className={`${input} text-xs`}
+          title="Demo only — real deployments read this from the session"
+        >
+          <option value="admin">Admin — Utkarsh</option>
+          <option value="editor">Editor — Priya</option>
+          <option value="viewer">Viewer — Jonas</option>
+          <option value="client">Client — Müller AG</option>
+        </select>
+        <p className="text-[11px] leading-snug text-slate-400">
+          Switch to <span className="font-medium">Client</span> to see exactly what an external account can reach.
+        </p>
+      </div>
+    </>
+  )
+
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
-        <Link to="/" className="flex items-center gap-2.5 px-4 py-4">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900">
-            HC
-          </span>
-          <span className="text-sm font-semibold leading-tight">
-            Hochhuth
-            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">Knowledge Base</span>
-          </span>
-        </Link>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-        <nav className="space-y-0.5 px-3">
-          <NavLink to="/" end className={navCls}>
-            Overview
-          </NavLink>
-
-          {counts.map(({ key, n }) => {
-            const t = typeDef(key)
-            return (
-              <NavLink key={key} to={`/type/${key}`} className={navCls}>
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone[t.tone].solid}`} />
-                  <span className="truncate">{t.label}</span>
-                </span>
-                <span className="tabular-nums text-xs text-slate-400">{n}</span>
-              </NavLink>
-            )
-          })}
-
-          {currentUser.role === 'admin' && (
-            <>
-              <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
-              <NavLink to="/admin" className={navCls}>
-                Admin
-              </NavLink>
-            </>
-          )}
-        </nav>
-
-        <div className="mt-auto space-y-1.5 border-t border-slate-200 p-4 dark:border-slate-800">
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Preview as role
-          </label>
-          <select
-            value={currentUser.role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className={`${input} text-xs`}
-            title="Demo only — real deployments read this from the session"
-          >
-            <option value="admin">Admin — Utkarsh</option>
-            <option value="editor">Editor — Priya</option>
-            <option value="viewer">Viewer — Jonas</option>
-            <option value="client">Client — Müller AG</option>
-          </select>
-          <p className="text-[11px] leading-snug text-slate-400">
-            Switch to <span className="font-medium">Client</span> to see exactly what an external account can reach.
-          </p>
+      {/* mobile nav drawer */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          <div className="absolute inset-0 bg-slate-900/40 animate-fade-in" onClick={() => setMobileNavOpen(false)} />
+          <aside className="relative flex h-full w-72 max-w-[80vw] animate-slide-in-right flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            {NavContent}
+          </aside>
         </div>
+      )}
+
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
+        {NavContent}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
-          <form
-            className="relative flex-1"
-            onSubmit={(e) => {
-              e.preventDefault()
-              navigate(`/browse?q=${encodeURIComponent(q)}`)
-            }}
+        <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-200 bg-white/90 px-3 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:gap-3 sm:px-4">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="rounded-md border border-slate-300 p-1.5 text-slate-600 dark:border-slate-700 dark:text-slate-300 md:hidden"
+            aria-label="Open navigation"
           >
-            <input
-              ref={searchRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search titles, content, tags, research findings…"
-              className={`${input} max-w-xl pr-14`}
-            />
-            <kbd className="pointer-events-none absolute right-3 top-2.5 hidden rounded border border-slate-300 px-1.5 text-[10px] text-slate-400 dark:border-slate-700 sm:block">
-              ⌘K
-            </kbd>
-          </form>
+            ☰
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className={`${input} flex max-w-xl flex-1 cursor-text items-center justify-between text-left text-slate-400`}
+          >
+            <span className="truncate">Search knowledge, ask a question, or find an expert…</span>
+            <Kbd>{isMac ? '⌘' : 'Ctrl'} K</Kbd>
+          </button>
+
+          <div className="relative" ref={noticesRef}>
+            <button
+              onClick={() => setNoticesOpen((o) => !o)}
+              className="relative rounded-lg border border-slate-300 p-2 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Notifications"
+            >
+              🔔
+              {unread.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                  {unread.length}
+                </span>
+              )}
+            </button>
+            {noticesOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-80 origin-top-right animate-scale-in rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800">
+                  Notifications
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notices.length === 0 && (
+                    <p className="px-4 py-6 text-center text-sm text-slate-400">You&rsquo;re all caught up.</p>
+                  )}
+                  {notices.slice(0, 12).map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        markNoticeRead(n.id)
+                        setNoticesOpen(false)
+                        navigate(`/entry/${n.entryId}`)
+                      }}
+                      className={`flex w-full items-start gap-2 border-b border-slate-50 px-4 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/60 ${
+                        isNoticeRead(n.id) ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <span aria-hidden>{n.icon}</span>
+                      <span className="min-w-0 flex-1">{n.text}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <button onClick={() => setDark((d) => !d)} className={btn.ghost} title="Toggle dark mode">
             {dark ? 'Light' : 'Dark'}
@@ -139,7 +232,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {canEdit(currentUser.role) && (
             <Link to="/new" className={btn.primary}>
-              New entry
+              <span className="hidden sm:inline">New entry</span>
+              <span className="sm:hidden">+</span>
             </Link>
           )}
         </header>

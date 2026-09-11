@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { Panel, btn, input } from '../components/ui'
+import { Link } from 'react-router-dom'
+import { computeHealth } from '../kb/health'
 import { useKb } from '../kb/store'
-import { Category } from '../types'
+import { Category, isExpired } from '../types'
+import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input } from '../components/ui'
 
 export default function Admin() {
   const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, resetToSeed } = useKb()
@@ -25,12 +27,30 @@ export default function Admin() {
     setNewPortfolio('')
   }
 
+  const health = computeHealth(entries)
+  const outdated = entries.filter((e) => e.verification.state === 'needs_update' || isExpired(e.verification)).sort((a, b) => b.views - a.views)
+
+  const contributors = Array.from(new Set(entries.map((e) => e.author)))
+    .map((name) => {
+      const authored = entries.filter((e) => e.author === name)
+      const activeRecently = authored.some((e) => Date.now() - new Date(e.updatedAt).getTime() < 90 * 86400000)
+      return { name, count: authored.length, activeRecently }
+    })
+    .sort((a, b) => b.count - a.count)
+
+  const mostViewed = [...entries].sort((a, b) => b.views - a.views).slice(0, 5)
+  const mostUseful = entries
+    .filter((e) => e.feedback.length > 0)
+    .map((e) => ({ e, ratio: e.feedback.filter((f) => f.verdict === 'yes').length / e.feedback.length }))
+    .sort((a, b) => b.ratio - a.ratio || b.e.feedback.length - a.e.feedback.length)
+    .slice(0, 5)
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold">Admin</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage the category taxonomy and see who has access.</p>
+          <PageTitle>Admin</PageTitle>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Knowledge health, taxonomy, and who has access.</p>
         </div>
         <button
           onClick={() => confirm('Reset all entries and categories back to the seed data? Your changes will be lost.') && resetToSeed()}
@@ -40,6 +60,118 @@ export default function Admin() {
         </button>
       </div>
 
+      {/* ---------- Knowledge health ---------- */}
+      <section className="space-y-4">
+        <SectionTitle>Knowledge health</SectionTitle>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+          <Stat label="Total" value={health.total} />
+          <Stat label="Verified" value={health.verified} tone="emerald" />
+          <Stat label="Under review" value={health.underReview} tone="sky" />
+          <Stat label="Needs update" value={health.needsUpdate} tone="amber" />
+          <Stat label="Expired" value={health.expired} tone="amber" />
+          <Stat label="Drafts" value={health.drafts} />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+          <Panel>
+            <div className="flex flex-col items-center justify-center p-6 text-center">
+              <div className="text-4xl font-bold tabular-nums">{health.score ?? '—'}{health.score !== null && '%'}</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Knowledge Health</div>
+              <p className="mt-2 text-[11px] leading-snug text-slate-400">
+                A weighted average of the components on the right. Not a scientific measurement — a rough signal of where the gaps are.
+              </p>
+            </div>
+          </Panel>
+
+          <Panel title="How the score is built" hint="Each component only counts if there's real data behind it">
+            <div className="space-y-3 p-4">
+              {health.components.map((c) => (
+                <div key={c.label}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">
+                      {c.label} <span className="text-xs font-normal text-slate-400">({c.weight}% weight)</span>
+                    </span>
+                    <span className="tabular-nums text-slate-500">{c.pct === null ? 'no data' : `${c.pct}%`}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-slate-900 transition-all duration-500 dark:bg-white"
+                      style={{ width: `${c.pct ?? 0}%` }}
+                    />
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-400">{c.detail}</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel title="Outdated knowledge" hint="Needs update, or past its scheduled review date">
+            {outdated.length === 0 ? (
+              <p className="p-4 text-sm text-slate-400">Nothing outdated right now.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {outdated.map((e) => (
+                  <li key={e.id} className="flex items-center gap-2 px-4 py-2.5">
+                    <Monogram type={e.type} size="sm" />
+                    <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                      {e.title}
+                    </Link>
+                    <VerificationBadge entry={e} size="sm" />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title="Active contributors" hint="Authors, by entries owned — bold if updated in the last 90 days">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {contributors.map((c) => (
+                <li key={c.name} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className={c.activeRecently ? 'font-medium' : 'text-slate-500 dark:text-slate-400'}>{c.name}</span>
+                  <span className="tabular-nums text-slate-400">{c.count}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          <Panel title="Most viewed">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {mostViewed.map((e) => (
+                <li key={e.id} className="flex items-center gap-2 px-4 py-2">
+                  <Monogram type={e.type} size="sm" />
+                  <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                    {e.title}
+                  </Link>
+                  <span className="shrink-0 text-xs tabular-nums text-slate-400">{e.views}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          <Panel title="Most useful" hint="Highest share of positive accuracy feedback">
+            {mostUseful.length === 0 ? (
+              <p className="p-4 text-sm text-slate-400">No feedback submitted yet.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {mostUseful.map(({ e, ratio }) => (
+                  <li key={e.id} className="flex items-center gap-2 px-4 py-2">
+                    <Monogram type={e.type} size="sm" />
+                    <Link to={`/entry/${e.id}`} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                      {e.title}
+                    </Link>
+                    <span className="shrink-0 text-xs tabular-nums text-slate-400">{Math.round(ratio * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </div>
+      </section>
+
+      {/* ---------- taxonomy ---------- */}
       <Panel title="Categories" hint="Entries are attached to a category id — deleting one just detaches its children, it never deletes entries">
         <table className="w-full text-sm">
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -109,6 +241,20 @@ export default function Admin() {
           </tbody>
         </table>
       </Panel>
+    </div>
+  )
+}
+
+function Stat({ label, value, tone: t }: { label: string; value: number; tone?: 'emerald' | 'sky' | 'amber' }) {
+  const styles = {
+    emerald: 'text-emerald-600 dark:text-emerald-400',
+    sky: 'text-sky-600 dark:text-sky-400',
+    amber: 'text-amber-600 dark:text-amber-400',
+  }
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className={`text-2xl font-bold tabular-nums ${t ? styles[t] : ''}`}>{value}</div>
+      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{label}</div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Category, Entry, User } from '../types'
+import { Category, Entry, Evidence, Feedback, ReviewEvent, User, Verification } from '../types'
 import { EntryTypeKey } from '../kb/schema'
 
 export const seedCategories: Category[] = [
@@ -28,6 +28,41 @@ export const seedUsers: User[] = [
 
 let seq = 0
 const ts = (iso: string) => new Date(iso).toISOString()
+const days = (n: number) => n * 86400000
+
+/** Builds a Verification record from a short description — every date/actor below traces back to something already in the entry's own narrative, nothing invented. */
+function verif(o: {
+  state: Verification['state']
+  verifiedBy?: string
+  verifiedAt?: string
+  reviewer?: string
+  submittedAt?: string
+  reviewIntervalDays?: number
+  history: { action: ReviewEvent['action']; by: string; at: string; note?: string }[]
+}): Verification {
+  const nextReviewAt =
+    o.verifiedAt && o.reviewIntervalDays
+      ? new Date(new Date(ts(o.verifiedAt)).getTime() + days(o.reviewIntervalDays)).toISOString()
+      : undefined
+  return {
+    state: o.state,
+    verifiedBy: o.verifiedBy,
+    verifiedAt: o.verifiedAt ? ts(o.verifiedAt) : undefined,
+    reviewer: o.reviewer,
+    submittedAt: o.submittedAt ? ts(o.submittedAt) : undefined,
+    reviewIntervalDays: o.reviewIntervalDays,
+    nextReviewAt,
+    checks:
+      o.state === 'verified' || o.state === 'partially_verified'
+        ? {
+            contentReviewed: true,
+            evidenceChecked: o.state === 'verified',
+            approachValidated: o.state === 'verified',
+          }
+        : undefined,
+    history: o.history.map((h) => ({ id: `rv${++seq}`, action: h.action, by: h.by, at: ts(h.at), note: h.note })),
+  }
+}
 
 function make(e: {
   id: string
@@ -45,12 +80,16 @@ function make(e: {
   status?: Entry['status']
   visibility?: Entry['visibility']
   author?: string
+  reviewer?: string
   createdAt: string
   updatedAt?: string
   views?: number
   relatedEntryIds?: string[]
   comments?: Entry['comments']
   attachments?: Entry['attachments']
+  evidence?: Evidence[]
+  feedback?: Feedback[]
+  verification?: Verification
 }): Entry {
   const created = ts(e.createdAt)
   const updated = ts(e.updatedAt ?? e.createdAt)
@@ -70,11 +109,15 @@ function make(e: {
     status: e.status ?? 'published',
     visibility: e.visibility ?? 'internal',
     author: e.author ?? 'Utkarsh (You)',
+    reviewer: e.reviewer,
     createdAt: created,
     updatedAt: updated,
     attachments: e.attachments ?? [],
+    evidence: e.evidence ?? [],
     relatedEntryIds: e.relatedEntryIds ?? [],
     comments: e.comments ?? [],
+    feedback: e.feedback ?? [],
+    verification: e.verification ?? { state: 'unverified', history: [] },
     versions: [
       {
         id: `sv${++seq}`,
@@ -99,6 +142,22 @@ function make(e: {
     views: e.views ?? 0,
   }
 }
+
+const ev = (type: Evidence['type'], label: string, url: string): Evidence => ({
+  id: `ev${Math.random().toString(36).slice(2, 8)}`,
+  type,
+  label,
+  url,
+})
+
+const fb = (by: string, verdict: Feedback['verdict'], at: string, reason?: Feedback['reason'], note?: string): Feedback => ({
+  id: `fb${Math.random().toString(36).slice(2, 8)}`,
+  by,
+  verdict,
+  reason,
+  note,
+  createdAt: ts(at),
+})
 
 export const seedEntries: Entry[] = [
   // ---------- Knowledge transfer ----------
@@ -137,14 +196,29 @@ export const seedEntries: Entry[] = [
         'https://hochhuth.sharepoint.com/kt/mueller-session-2',
       ],
     },
+    evidence: [
+      ev('reference', 'KT session recording — architecture walkthrough', 'https://hochhuth.sharepoint.com/kt/mueller-session-1'),
+      ev('reference', 'KT session recording — deployment dry-run', 'https://hochhuth.sharepoint.com/kt/mueller-session-2'),
+    ],
     comments: [
       {
         id: 'c-kt1',
-        author: 'Jonas Weber',
-        body: 'Shipped MUE-412 on my own, deployment steps were accurate. Marking this verified.',
-        createdAt: '2026-08-12T15:18:00Z',
+        author: 'Utkarsh (You)',
+        body: 'Add a note about CORS setup.',
+        createdAt: '2026-07-30T08:00:00Z',
       },
     ],
+    feedback: [fb('Jonas Weber', 'yes', '2026-08-12T15:18:00Z', undefined, 'Shipped MUE-412 on my own, deployment steps were accurate.')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Jonas Weber',
+      verifiedAt: '2026-08-12T15:18:00Z',
+      reviewIntervalDays: 90,
+      history: [
+        { action: 'submitted', by: 'Priya Sharma', at: '2026-08-12T09:00:00Z', note: 'Handover sessions complete, ready for sign-off.' },
+        { action: 'approved', by: 'Jonas Weber', at: '2026-08-12T15:18:00Z', note: 'Shipped MUE-412 on my own, deployment steps were accurate.' },
+      ],
+    }),
   }),
   make({
     id: 'kt-billing-pipeline',
@@ -158,6 +232,7 @@ export const seedEntries: Entry[] = [
     tags: ['billing', 'handover', 'on-call'],
     stage: 'in_progress',
     status: 'draft',
+    reviewer: 'Priya Sharma',
     createdAt: '2026-09-04T08:00:00Z',
     updatedAt: '2026-09-09T16:40:00Z',
     views: 11,
@@ -175,6 +250,7 @@ export const seedEntries: Entry[] = [
       contacts: ['Utkarsh (You)'],
       sessionLinks: ['https://hochhuth.sharepoint.com/kt/billing-session-1'],
     },
+    evidence: [ev('reference', 'KT session recording — architecture walkthrough', 'https://hochhuth.sharepoint.com/kt/billing-session-1')],
   }),
 
   // ---------- Research / R&D ----------
@@ -213,6 +289,11 @@ export const seedEntries: Entry[] = [
         'https://learn.microsoft.com/graph/api/resources/driveitem',
       ],
     },
+    evidence: [
+      ev('doc', 'Azure OpenAI data privacy & residency docs', 'https://learn.microsoft.com/azure/ai-services/openai/concepts/data-privacy'),
+      ev('doc', 'Microsoft Graph driveItem reference', 'https://learn.microsoft.com/graph/api/resources/driveitem'),
+      ev('benchmark', 'Blind-rated summary accuracy — 3 configs, 240 docs', 'https://hochhuth.sharepoint.com/research/ai-doc-summary-benchmark'),
+    ],
     comments: [
       {
         id: 'c-rd1',
@@ -221,6 +302,17 @@ export const seedEntries: Entry[] = [
         createdAt: '2026-07-01T09:12:00Z',
       },
     ],
+    feedback: [fb('Jonas Weber', 'yes', '2026-07-10T10:00:00Z')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Priya Sharma',
+      verifiedAt: '2026-07-02T09:00:00Z',
+      reviewIntervalDays: 90,
+      history: [
+        { action: 'submitted', by: 'Utkarsh (You)', at: '2026-06-30T11:00:00Z' },
+        { action: 'approved', by: 'Priya Sharma', at: '2026-07-02T09:00:00Z', note: 'Hallucination rate now called out up front — good to ship.' },
+      ],
+    }),
   }),
   make({
     id: 'rd-react19-spfx',
@@ -234,6 +326,7 @@ export const seedEntries: Entry[] = [
     tags: ['upgrade', 'react19', 'tech-debt'],
     stage: 'in_progress',
     author: 'Priya Sharma',
+    reviewer: 'Utkarsh (You)',
     createdAt: '2026-08-25T09:00:00Z',
     updatedAt: '2026-09-08T14:00:00Z',
     views: 47,
@@ -254,6 +347,17 @@ export const seedEntries: Entry[] = [
       effort: '4 person-days so far',
       references: ['https://learn.microsoft.com/sharepoint/dev/spfx/release-notes', 'https://react.dev/blog'],
     },
+    evidence: [
+      ev('doc', 'SPFx release notes', 'https://learn.microsoft.com/sharepoint/dev/spfx/release-notes'),
+      ev('doc', 'React blog — release announcements', 'https://react.dev/blog'),
+      ev('benchmark', 'Bundle size comparison — 3 approaches', 'https://hochhuth.sharepoint.com/research/react19-bundle-comparison'),
+    ],
+    verification: verif({
+      state: 'in_review',
+      reviewer: 'Utkarsh (You)',
+      submittedAt: '2026-09-08T14:00:00Z',
+      history: [{ action: 'submitted', by: 'Priya Sharma', at: '2026-09-08T14:00:00Z', note: 'Ready for a second pair of eyes before we commit to option (a).' }],
+    }),
   }),
   make({
     id: 'rd-rag-sharepoint',
@@ -282,6 +386,7 @@ export const seedEntries: Entry[] = [
       effort: 'est. 10 person-days',
       references: ['https://learn.microsoft.com/azure/search/search-security-trimming-for-azure-search'],
     },
+    evidence: [ev('doc', 'Azure AI Search — security trimming', 'https://learn.microsoft.com/azure/search/search-security-trimming-for-azure-search')],
   }),
 
   // ---------- Decision records ----------
@@ -311,6 +416,17 @@ export const seedEntries: Entry[] = [
       deciders: ['Utkarsh (You)', 'Priya Sharma'],
       decidedOn: '2026-03-11',
     },
+    feedback: [fb('Priya Sharma', 'yes', '2026-03-12T09:00:00Z')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Priya Sharma',
+      verifiedAt: '2026-03-11T09:00:00Z',
+      reviewIntervalDays: 365,
+      history: [
+        { action: 'submitted', by: 'Utkarsh (You)', at: '2026-03-11T09:00:00Z' },
+        { action: 'approved', by: 'Priya Sharma', at: '2026-03-11T09:00:00Z', note: 'Matches what we already do in practice — good to write down.' },
+      ],
+    }),
   }),
   make({
     id: 'dr-ai-search',
@@ -338,6 +454,13 @@ export const seedEntries: Entry[] = [
       deciders: ['Utkarsh (You)'],
       decidedOn: '2026-07-02',
     },
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-07-02T09:00:00Z',
+      reviewIntervalDays: 365,
+      history: [{ action: 'approved', by: 'Utkarsh (You)', at: '2026-07-02T09:00:00Z', note: 'Sole decider — recording the decision as final.' }],
+    }),
   }),
 
   // ---------- How-tos ----------
@@ -363,6 +486,9 @@ export const seedEntries: Entry[] = [
         '1. `mkdir my-webpart && cd my-webpart`\n2. `yo @microsoft/sharepoint` — pick **WebPart**, **React**, and *no* Fluent scaffold if you plan to theme it yourself.\n3. `gulp trust-dev-cert` (once per machine).\n4. Set `initialPage` in `config/serve.json` to the dev tenant workbench URL.\n5. `gulp serve --nobrowser`, then open the workbench and add your web part.\n6. Copy the CI pipeline YAML from the template repo into `.azure/pipelines.yml` before your first PR.',
       rollback:
         'Nothing to roll back — but if `gulp serve` fails with a certificate error, re-run `gulp trust-dev-cert` and restart the terminal. On an SSL error in the workbench only, the cert is trusted for the wrong Node version.',
+      recommendedWhen: 'Any new SPFx web part, from a greenfield tenant or an existing one already on the standard toolchain.',
+      avoidWhen: 'The client tenant is still on classic pages only — see the legacy onboarding article instead.',
+      limitations: 'Assumes Node 18 and the standard SPFx 1.19 toolchain. Does not cover Fluent UI v9 (blocked — see the React 19 research).',
       timeEstimate: '20–30 min on a machine that already has Node 18',
       lastVerified: '2026-08-30',
     },
@@ -375,6 +501,17 @@ export const seedEntries: Entry[] = [
         createdAt: '2026-08-30T10:31:00Z',
       },
     ],
+    feedback: [fb('Jonas Weber', 'yes', '2026-08-31T09:00:00Z')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-08-30T10:30:00Z',
+      reviewIntervalDays: 182,
+      history: [
+        { action: 'submitted', by: 'Priya Sharma', at: '2026-06-02T09:00:00Z' },
+        { action: 'approved', by: 'Utkarsh (You)', at: '2026-08-30T10:30:00Z', note: 'Added the Node 18 warning, re-ran the steps end to end — accurate.' },
+      ],
+    }),
   }),
   make({
     id: 'howto-spfx-deploy',
@@ -395,10 +532,24 @@ export const seedEntries: Entry[] = [
       steps:
         '1. `gulp bundle --ship && gulp package-solution --ship`\n2. Upload the `.sppkg` from `sharepoint/solution/` to the tenant app catalog.\n3. Tick **Make this solution available to all sites** only if the web part is genuinely tenant-wide.\n4. In the SharePoint admin centre, go to **Advanced → API access** and approve the pending requests.\n5. Bump the version in `package-solution.json` — SharePoint caches aggressively and will serve the old bundle otherwise.\n6. Hard-refresh a page using the web part and confirm the new version renders.',
       rollback: 'Re-upload the previous `.sppkg` (keep the last two in the release folder) and bump the version again. The app catalog keeps no history you can rely on.',
+      recommendedWhen: 'Every client tenant release on the standard SPFx toolchain — this is the one true path, not a suggestion.',
+      limitations: 'Step 4 describes the pre-August admin centre layout. The client tenant UI moved and this needs re-verifying against the new layout.',
       timeEstimate: '45 min, plus however long the client admin takes to approve',
       lastVerified: '2026-05-02',
     },
     content: '> Marked **needs review**: the SharePoint admin centre UI moved in the August tenant update, so step 4 may not match what you see.',
+    feedback: [fb('Jonas Weber', 'no', '2026-09-01T10:00:00Z', 'outdated', 'Step 4 does not match the current admin centre at all — had to hunt for the new location.')],
+    verification: verif({
+      state: 'needs_update',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-05-02T09:00:00Z',
+      reviewIntervalDays: 90,
+      history: [
+        { action: 'submitted', by: 'Utkarsh (You)', at: '2026-04-18T09:00:00Z' },
+        { action: 'approved', by: 'Utkarsh (You)', at: '2026-05-02T09:00:00Z' },
+        { action: 'marked_needs_update', by: 'Jonas Weber', at: '2026-09-01T10:00:00Z', note: 'Step 4 does not match the current admin centre layout.' },
+      ],
+    }),
   }),
 
   // ---------- Snippets ----------
@@ -436,7 +587,20 @@ await execute();`,
         'Use it anywhere you are updating more than ~5 items. Note the batched client is a *separate* instance — calls on the original `sp` are not part of the batch, which is the mistake everyone makes first.',
       gotchas:
         '- A batch is capped at 100 requests server-side; chunk larger sets.\n- One failing item does **not** roll the batch back. Check each response if partial success matters.\n- `getById().update()` inside a batch still needs the item to exist — a deleted id fails that one request only.',
+      recommendedWhen: 'Updating more than ~5 list items in one operation.',
+      avoidWhen: 'A single item update, or when you need all-or-nothing semantics — batching does not roll back partial failures.',
     },
+    feedback: [fb('Jonas Weber', 'yes', '2026-07-01T09:00:00Z')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Priya Sharma',
+      verifiedAt: '2026-06-25T09:00:00Z',
+      history: [
+        { action: 'submitted', by: 'Utkarsh (You)', at: '2026-06-21T09:00:00Z' },
+        { action: 'approved', by: 'Priya Sharma', at: '2026-06-25T09:00:00Z', note: 'Used this on the Müller AG project, confirmed the numbers.' },
+      ],
+      // no reviewIntervalDays: a stable code pattern doesn't need a scheduled re-check
+    }),
   }),
   make({
     id: 'snip-kql-failed-funcs',
@@ -497,6 +661,16 @@ await execute();`,
     },
     content:
       'The fix was quick once found. The six hours were: nobody was alerted, and the redeploy needed a client admin who was in a meeting. Both addressed.',
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-03-04T12:00:00Z',
+      // no scheduled re-review: a closed incident record is a historical fact, not a living doc
+      history: [
+        { action: 'submitted', by: 'Utkarsh (You)', at: '2026-02-20T09:00:00Z' },
+        { action: 'approved', by: 'Utkarsh (You)', at: '2026-03-04T12:00:00Z', note: 'All four action items closed, root cause confirmed.' },
+      ],
+    }),
   }),
 
   // ---------- Articles ----------
@@ -515,6 +689,14 @@ await execute();`,
     content:
       '## What you can see\n\nYour account sees only entries we have explicitly marked **client-visible** and **published**. That is normally:\n\n- documentation for systems we built for you\n- handover and training material for your team\n- release notes and access policies\n\n## What you cannot see\n\n- internal drafts and archived material\n- our internal discussion threads and edit history\n- anything relating to other clients\n- internal research that has not been cleared for sharing\n\n## Asking for access\n\nIf something you need is not visible, ask your engagement lead — we can mark individual entries client-visible on request.',
     details: { appliesTo: 'All client accounts' },
+    feedback: [fb('Müller AG — B. Keller', 'yes', '2026-05-20T09:00:00Z')],
+    verification: verif({
+      state: 'verified',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-05-10T09:00:00Z',
+      reviewIntervalDays: 182,
+      history: [{ action: 'approved', by: 'Utkarsh (You)', at: '2026-05-10T09:00:00Z', note: 'Client-visible policy — reviewed before publishing externally.' }],
+    }),
   }),
   make({
     id: 'art-versioning',
@@ -532,6 +714,20 @@ await execute();`,
     content:
       '## Numbering\n\n`MAJOR.MINOR.PATCH.BUILD` in `package-solution.json`. SharePoint compares these as four integers, so **never** use a pre-release suffix — it will not install.\n\n- **MAJOR** — breaking change to a web part\'s properties or stored data\n- **MINOR** — new web part or new feature\n- **PATCH** — bug fix\n- **BUILD** — set by CI, never by hand\n\n## Branches\n\n`main` is always deployable. Release branches (`release/1.4`) exist only when a client is pinned to an old version and needs a backport.\n\n## Release notes\n\nEvery release gets an entry here as a knowledge article, tagged `release` and the client tag. Include: version, what changed, whether a tenant admin approval is needed, and the rollback version.',
     details: { appliesTo: 'All SPFx client solutions' },
+    verification: verif({
+      state: 'partially_verified',
+      verifiedBy: 'Priya Sharma',
+      verifiedAt: '2026-06-11T09:00:00Z',
+      reviewIntervalDays: 182,
+      history: [
+        {
+          action: 'partially_approved',
+          by: 'Priya Sharma',
+          at: '2026-06-11T09:00:00Z',
+          note: 'Numbering and branching confirmed. Release-notes process still needs a real example to point to.',
+        },
+      ],
+    }),
   }),
   make({
     id: 'art-archived-onboarding',
@@ -548,5 +744,11 @@ await execute();`,
     views: 19,
     content: 'Archived. Use the SPFx how-to instead unless you are working on `/sites/intranet-old` for Müller AG.',
     details: { appliesTo: 'Legacy classic sites only' },
+    verification: verif({
+      state: 'deprecated',
+      verifiedBy: 'Utkarsh (You)',
+      verifiedAt: '2026-03-12T09:00:00Z',
+      history: [{ action: 'deprecated', by: 'Utkarsh (You)', at: '2026-03-12T09:00:00Z', note: 'Superseded by the SPFx how-to — kept only for the two remaining classic-page clients.' }],
+    }),
   }),
 ]

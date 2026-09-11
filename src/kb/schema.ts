@@ -67,6 +67,9 @@ export const ENTRY_TYPES = {
       { key: 'prerequisites', label: 'Prerequisites', kind: 'markdown', hint: 'Access, tooling or approvals needed first' },
       { key: 'steps', label: 'Steps', kind: 'markdown', required: true, hint: 'Numbered list — one action per step' },
       { key: 'rollback', label: 'Rollback / if it goes wrong', kind: 'markdown' },
+      { key: 'recommendedWhen', label: 'Recommended when', kind: 'markdown', hint: 'The situation this is actually the right call' },
+      { key: 'avoidWhen', label: 'Avoid when', kind: 'markdown', hint: 'When to reach for something else instead' },
+      { key: 'limitations', label: 'Known limitations', kind: 'markdown' },
       { key: 'timeEstimate', label: 'Typical time', kind: 'text', half: true },
       { key: 'lastVerified', label: 'Last verified', kind: 'date', half: true },
     ],
@@ -165,6 +168,8 @@ export const ENTRY_TYPES = {
       { key: 'code', label: 'Code', kind: 'code', required: true },
       { key: 'usage', label: 'How to use it', kind: 'markdown' },
       { key: 'gotchas', label: 'Gotchas', kind: 'markdown' },
+      { key: 'recommendedWhen', label: 'Recommended when', kind: 'markdown' },
+      { key: 'avoidWhen', label: 'Avoid when', kind: 'markdown', hint: 'When to reach for something else instead' },
     ],
   },
 
@@ -228,3 +233,38 @@ export const ENTRY_STATUSES = [
   { key: 'published', label: 'Published', tone: 'green' as Tone },
   { key: 'archived', label: 'Archived', tone: 'gray' as Tone },
 ]
+
+/** Evidence types a contributor can attach — kept generic, no fake API integration. */
+export const EVIDENCE_TYPES: { key: string; label: string; icon: string }[] = [
+  { key: 'url', label: 'Link', icon: '🔗' },
+  { key: 'pr', label: 'GitHub PR', icon: '🔀' },
+  { key: 'issue', label: 'GitHub issue', icon: '🐛' },
+  { key: 'benchmark', label: 'Benchmark', icon: '📊' },
+  { key: 'doc', label: 'Documentation', icon: '📄' },
+  { key: 'screenshot', label: 'Screenshot', icon: '🖼️' },
+  { key: 'reference', label: 'Internal reference', icon: '📎' },
+]
+
+export const evidenceTypeLabel = (key: string) => EVIDENCE_TYPES.find((t) => t.key === key)?.label ?? 'Link'
+export const evidenceTypeIcon = (key: string) => EVIDENCE_TYPES.find((t) => t.key === key)?.icon ?? '🔗'
+
+/**
+ * The trust ladder. One source of truth for label/tone/icon/description so the
+ * badge on a card, the panel on a detail page, and the review queue all agree.
+ */
+export const VERIFICATION_META: Record<
+  string,
+  { label: string; tone: Tone; icon: string; description: string }
+> = {
+  unverified: { label: 'Unverified', tone: 'gray', icon: '○', description: 'Nobody has reviewed this yet.' },
+  in_review: { label: 'Under review', tone: 'blue', icon: '◐', description: 'Waiting for a reviewer to look at it.' },
+  verified: { label: 'Verified', tone: 'green', icon: '✓', description: 'Reviewed and confirmed accurate.' },
+  partially_verified: {
+    label: 'Partially verified',
+    tone: 'amber',
+    icon: '◑',
+    description: 'Some parts confirmed, some not yet checked.',
+  },
+  needs_update: { label: 'Needs update', tone: 'amber', icon: '⚠', description: 'Flagged as possibly out of date.' },
+  deprecated: { label: 'Deprecated', tone: 'red', icon: '✕', description: 'No longer recommended — kept for history.' },
+}

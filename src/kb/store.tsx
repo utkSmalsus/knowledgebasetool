@@ -1,18 +1,44 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { seedCategories, seedEntries, seedPortfolios, seedUsers } from '../data/seed'
-import { Category, Comment, Entry, Role, User, Version, visibleTo } from '../types'
+import {
+  Category,
+  Comment,
+  Entry,
+  Feedback,
+  ReviewAction,
+  Role,
+  User,
+  Verification,
+  VerificationChecks,
+  Version,
+  visibleTo,
+} from '../types'
 
-const KEY = 'hochhuth-kb.v2'
+const KEY = 'hochhuth-kb.v3'
 
 interface Persisted {
   entries: Entry[]
   categories: Category[]
   portfolios: string[]
   role: Role
+  /** Per-user id -> saved/recently-viewed entry ids, and read-notification ids. All keyed by User.id. */
+  saved: Record<string, string[]>
+  recentlyViewed: Record<string, string[]>
+  readNotices: Record<string, string[]>
 }
 
+const emptyPersisted = (): Persisted => ({
+  entries: seedEntries,
+  categories: seedCategories,
+  portfolios: seedPortfolios,
+  role: 'admin',
+  saved: {},
+  recentlyViewed: {},
+  readNotices: {},
+})
+
 function load(): Persisted {
-  const fallback: Persisted = { entries: seedEntries, categories: seedCategories, portfolios: seedPortfolios, role: 'admin' }
+  const fallback = emptyPersisted()
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return fallback
@@ -23,11 +49,16 @@ function load(): Persisted {
       categories: Array.isArray(parsed.categories) ? parsed.categories : seedCategories,
       portfolios: Array.isArray(parsed.portfolios) ? parsed.portfolios : seedPortfolios,
       role: parsed.role ?? 'admin',
+      saved: parsed.saved ?? {},
+      recentlyViewed: parsed.recentlyViewed ?? {},
+      readNotices: parsed.readNotices ?? {},
     }
   } catch {
     return fallback // corrupt or unavailable storage -> fall back to seed, don't blow up
   }
 }
+
+const RECENT_CAP = 8
 
 interface KbValue {
   entries: Entry[]
@@ -49,21 +80,40 @@ interface KbValue {
   addPortfolio: (name: string) => void
   removePortfolio: (name: string) => void
   resetToSeed: () => void
+
+  // trust layer
+  submitForReview: (entryId: string, reviewer?: string) => void
+  approve: (entryId: string, opts: { checks: VerificationChecks; note?: string; reviewIntervalDays?: number }) => void
+  requestChanges: (entryId: string, note: string) => void
+  reject: (entryId: string, note: string) => void
+  markNeedsUpdate: (entryId: string, note: string) => void
+  deprecate: (entryId: string, note: string) => void
+  addFeedback: (entryId: string, feedback: Omit<Feedback, 'id' | 'createdAt'>) => void
+
+  // per-user
+  isSaved: (entryId: string) => boolean
+  toggleSaved: (entryId: string) => void
+  savedEntries: Entry[]
+  recentlyViewedEntries: Entry[]
+  markViewed: (entryId: string) => void
+  isNoticeRead: (id: string) => boolean
+  markNoticeRead: (id: string) => void
 }
 
 const Ctx = createContext<KbValue | undefined>(undefined)
 
 export function KbProvider({ children }: { children: React.ReactNode }) {
-  const [{ entries, categories, portfolios, role }, setState] = useState<Persisted>(load)
+  const [state, setState] = useState<Persisted>(load)
+  const { entries, categories, portfolios, role, saved, recentlyViewed, readNotices } = state
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ entries, categories, portfolios, role }))
+      localStorage.setItem(KEY, JSON.stringify(state))
     } catch {
       /* quota or private mode — the app still works, it just won't remember.
          ponytail: attachments are stored as data URLs, so a few large files can hit this. */
     }
-  }, [entries, categories, portfolios, role])
+  }, [state])
 
   const patch = (p: Partial<Persisted>) => setState((s) => ({ ...s, ...p }))
   const mapEntries = (fn: (e: Entry) => Entry) => setState((s) => ({ ...s, entries: s.entries.map(fn) }))
@@ -83,6 +133,11 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
     visibility: e.visibility,
     portfolio: e.portfolio,
     project: e.project,
+  })
+
+  const logEvent = (v: Verification, action: ReviewAction, by: string, note?: string): Verification => ({
+    ...v,
+    history: [...v.history, { id: `rv${Date.now()}${Math.random().toString(36).slice(2, 5)}`, action, by, at: new Date().toISOString(), note }],
   })
 
   const value: KbValue = {
@@ -177,7 +232,113 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
       setState((s) => ({ ...s, portfolios: s.portfolios.filter((p) => p !== name) })),
     // entries keep their portfolio string even if removed from the list — same "orphan, don't cascade" rule as categories
 
-    resetToSeed: () => setState({ entries: seedEntries, categories: seedCategories, portfolios: seedPortfolios, role }),
+    resetToSeed: () => setState(emptyPersisted()),
+
+    // -------------------- trust layer --------------------
+
+    submitForReview: (entryId, reviewer) =>
+      mapEntries((e) => {
+        if (e.id !== entryId) return e
+        const now = new Date().toISOString()
+        return {
+          ...e,
+          reviewer: reviewer ?? e.reviewer,
+          verification: logEvent(
+            { ...e.verification, state: 'in_review', submittedAt: now, reviewer: reviewer ?? e.reviewer },
+            'submitted',
+            currentUser.name,
+          ),
+        }
+      }),
+
+    approve: (entryId, opts) =>
+      mapEntries((e) => {
+        if (e.id !== entryId) return e
+        const now = new Date().toISOString()
+        const days = opts.reviewIntervalDays
+        const nextReviewAt = days ? new Date(Date.now() + days * 86400000).toISOString() : undefined
+        const partial = !(opts.checks.contentReviewed && opts.checks.evidenceChecked && opts.checks.approachValidated)
+        const v: Verification = {
+          ...e.verification,
+          state: partial ? 'partially_verified' : 'verified',
+          verifiedBy: currentUser.name,
+          verifiedAt: now,
+          reviewer: undefined,
+          reviewIntervalDays: days,
+          nextReviewAt,
+          checks: opts.checks,
+        }
+        return { ...e, verification: logEvent(v, partial ? 'partially_approved' : 'approved', currentUser.name, opts.note) }
+      }),
+
+    requestChanges: (entryId, note) =>
+      mapEntries((e) =>
+        e.id === entryId
+          ? {
+              ...e,
+              status: 'draft',
+              verification: logEvent({ ...e.verification, state: 'unverified', reviewer: undefined }, 'changes_requested', currentUser.name, note),
+            }
+          : e,
+      ),
+
+    reject: (entryId, note) =>
+      mapEntries((e) =>
+        e.id === entryId
+          ? {
+              ...e,
+              verification: logEvent({ ...e.verification, state: 'unverified', reviewer: undefined }, 'rejected', currentUser.name, note),
+            }
+          : e,
+      ),
+
+    markNeedsUpdate: (entryId, note) =>
+      mapEntries((e) =>
+        e.id === entryId ? { ...e, verification: logEvent({ ...e.verification, state: 'needs_update' }, 'marked_needs_update', currentUser.name, note) } : e,
+      ),
+
+    deprecate: (entryId, note) =>
+      mapEntries((e) =>
+        e.id === entryId ? { ...e, verification: logEvent({ ...e.verification, state: 'deprecated' }, 'deprecated', currentUser.name, note) } : e,
+      ),
+
+    addFeedback: (entryId, feedback) => {
+      const item: Feedback = { ...feedback, id: `fb${Date.now()}`, createdAt: new Date().toISOString() }
+      mapEntries((e) => (e.id === entryId ? { ...e, feedback: [...e.feedback, item] } : e))
+    },
+
+    // -------------------- per-user --------------------
+
+    isSaved: (entryId) => (saved[currentUser.id] ?? []).includes(entryId),
+
+    toggleSaved: (entryId) =>
+      setState((s) => {
+        const mine = s.saved[currentUser.id] ?? []
+        const next = mine.includes(entryId) ? mine.filter((id) => id !== entryId) : [entryId, ...mine]
+        return { ...s, saved: { ...s.saved, [currentUser.id]: next } }
+      }),
+
+    savedEntries: (saved[currentUser.id] ?? []).map((id) => entries.find((e) => e.id === id)).filter((e): e is Entry => !!e),
+
+    recentlyViewedEntries: (recentlyViewed[currentUser.id] ?? [])
+      .map((id) => entries.find((e) => e.id === id))
+      .filter((e): e is Entry => !!e),
+
+    markViewed: (entryId) =>
+      setState((s) => {
+        const mine = s.recentlyViewed[currentUser.id] ?? []
+        const next = [entryId, ...mine.filter((id) => id !== entryId)].slice(0, RECENT_CAP)
+        return { ...s, recentlyViewed: { ...s.recentlyViewed, [currentUser.id]: next } }
+      }),
+
+    isNoticeRead: (id) => (readNotices[currentUser.id] ?? []).includes(id),
+
+    markNoticeRead: (id) =>
+      setState((s) => {
+        const mine = s.readNotices[currentUser.id] ?? []
+        if (mine.includes(id)) return s
+        return { ...s, readNotices: { ...s.readNotices, [currentUser.id]: [...mine, id] } }
+      }),
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

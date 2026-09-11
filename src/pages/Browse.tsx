@@ -27,6 +27,7 @@ function useUrlFilters(fixedType?: EntryTypeKey): [Filters, (patch: Partial<Filt
     stage: params.get('stage') ?? '',
     tag: params.get('tag') ?? '',
     author: params.get('author') ?? '',
+    verifiedOnly: params.get('verified') === '1',
     sort: (params.get('sort') as Filters['sort']) ?? 'relevance',
   }
   const patch = (p: Partial<Filters>) => {
@@ -43,6 +44,7 @@ function useUrlFilters(fixedType?: EntryTypeKey): [Filters, (patch: Partial<Filt
     if (next.stage) sp.set('stage', next.stage)
     if (next.tag) sp.set('tag', next.tag)
     if (next.author) sp.set('author', next.author)
+    if (next.verifiedOnly) sp.set('verified', '1')
     if (next.sort !== 'relevance') sp.set('sort', next.sort)
     setParams(sp, { replace: true })
   }
@@ -206,6 +208,11 @@ export default function Browse() {
             </select>
           </FacetGroup>
         )}
+
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.verifiedOnly} onChange={(e) => patch({ verifiedOnly: e.target.checked })} />
+          Verified only
+        </label>
       </aside>
 
       <section className="space-y-4">
@@ -229,12 +236,15 @@ export default function Browse() {
           {results.length} {results.length === 1 ? 'result' : 'results'}
         </p>
 
-        <div className="space-y-3">
+        <div className="stagger space-y-3">
           {results.length === 0 && (
-            <Empty title="No entries match your filters" hint="Try clearing a filter or broadening your search." />
+            <Empty
+              title="We couldn't find anything matching that"
+              hint={f.q ? `Try a broader term, or clear a filter.` : 'Try clearing a filter or broadening your search.'}
+            />
           )}
           {results.map((e) => (
-            <EntryCard key={e.id} entry={e} showVisibility={internal} />
+            <EntryCard key={e.id} entry={e} showVisibility={internal} query={f.q} />
           ))}
         </div>
       </section>

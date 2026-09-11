@@ -13,6 +13,7 @@ export interface Filters {
   stage: string
   tag: string
   author: string
+  verifiedOnly: boolean
   sort: 'relevance' | 'updated' | 'created' | 'title' | 'views'
 }
 
@@ -28,6 +29,7 @@ export const emptyFilters: Filters = {
   stage: '',
   tag: '',
   author: '',
+  verifiedOnly: false,
   sort: 'relevance',
 }
 
@@ -104,6 +106,7 @@ export function applyFilters(entries: Entry[], f: Filters, categories: Category[
       if (f.stage && entry.stage !== f.stage) return false
       if (f.tag && !entry.tags.includes(f.tag)) return false
       if (f.author && entry.author !== f.author) return false
+      if (f.verifiedOnly && entry.verification.state !== 'verified') return false
       return true
     })
 
@@ -118,7 +121,16 @@ export function applyFilters(entries: Entry[], f: Filters, categories: Category[
   return hits.sort(by[f.sort] ?? by.relevance).map((h) => h.entry)
 }
 
+/** Which of an entry's own tags/tech actually matched the query — the "relevant because" chips. */
+export function relevantBecause(entry: Entry, query: string): string[] {
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return []
+  const candidates = [...entry.tags, ...entry.tech.map(techLabel)]
+  return candidates.filter((c) => tokens.some((t) => c.toLowerCase().includes(t)))
+}
+
 export const activeFilterCount = (f: Filters) =>
   f.types.length +
   f.tech.length +
-  [f.category, f.portfolio, f.project, f.status, f.visibility, f.stage, f.tag, f.author].filter(Boolean).length
+  [f.category, f.portfolio, f.project, f.status, f.visibility, f.stage, f.tag, f.author].filter(Boolean).length +
+  (f.verifiedOnly ? 1 : 0)
