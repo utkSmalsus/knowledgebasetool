@@ -1,16 +1,50 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useToast } from '../components/Toast'
 import { computeHealth } from '../kb/health'
 import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
+import { isSharePointConfigured, sharepointConfig } from '../kb/sharepoint/config'
+import { pullEntriesFromSharePoint, pushEntriesToSharePoint } from '../kb/sharepoint/sync'
 import { useKb } from '../kb/store'
 import { Category, isExpired } from '../types'
 import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input, tone } from '../components/ui'
 
 export default function Admin() {
-  const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, resetToSeed } = useKb()
+  const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, resetToSeed, importEntries } =
+    useKb()
   const [newCat, setNewCat] = useState('')
   const [newParent, setNewParent] = useState('')
   const [newPortfolio, setNewPortfolio] = useState('')
+  const toast = useToast()
+  const [spBusy, setSpBusy] = useState<'pull' | 'push' | null>(null)
+  const [spProgress, setSpProgress] = useState<{ done: number; total: number } | null>(null)
+
+  const handlePull = async () => {
+    setSpBusy('pull')
+    try {
+      const pulled = await pullEntriesFromSharePoint()
+      importEntries(pulled)
+      toast(`Pulled ${pulled.length} entries from SharePoint.`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Pull from SharePoint failed.', 'error')
+    } finally {
+      setSpBusy(null)
+      setSpProgress(null)
+    }
+  }
+
+  const handlePush = async () => {
+    setSpBusy('push')
+    try {
+      await pushEntriesToSharePoint(entries, (done, total) => setSpProgress({ done, total }))
+      toast(`Pushed ${entries.length} entries to SharePoint.`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Push to SharePoint failed.', 'error')
+    } finally {
+      setSpBusy(null)
+      setSpProgress(null)
+    }
+  }
 
   const addCategory = (e: React.FormEvent) => {
     e.preventDefault()
@@ -290,6 +324,64 @@ export default function Admin() {
             ))}
           </tbody>
         </table>
+      </Panel>
+
+      {/* ---------- SharePoint connectivity ---------- */}
+      <Panel
+        title="SharePoint"
+        hint="Connects this browser to a SharePoint list on demand — it does not replace local storage as the source of truth. See SHAREPOINT.md for setup."
+      >
+        <div className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
+                isSharePointConfigured()
+                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-900'
+                  : 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-900'
+              }`}
+            >
+              {isSharePointConfigured() ? '● Configured' : '○ Not configured'}
+            </span>
+            <span className="text-slate-500 dark:text-slate-400">
+              Mode: <span className="font-medium text-slate-700 dark:text-slate-300">{sharepointConfig.authMode}</span>
+              {sharepointConfig.siteUrl && (
+                <>
+                  {' '}
+                  · Site: <span className="font-medium text-slate-700 dark:text-slate-300">{sharepointConfig.siteUrl}</span>
+                </>
+              )}
+              {' '}
+              · List: <span className="font-medium text-slate-700 dark:text-slate-300">{sharepointConfig.listName}</span>
+            </span>
+          </div>
+
+          {!isSharePointConfigured() && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Set <code className="rounded bg-slate-100 px-1 py-0.5 dark:bg-slate-800">VITE_SP_SITE_URL</code> (and the MSAL vars, if using{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 dark:bg-slate-800">msal</code> mode) in your{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 dark:bg-slate-800">.env</code> file, then restart the dev server. See
+              SHAREPOINT.md for the full walkthrough.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={handlePull} disabled={!isSharePointConfigured() || spBusy !== null} className={btn.ghost}>
+              {spBusy === 'pull' ? 'Pulling…' : 'Pull from SharePoint'}
+            </button>
+            <button onClick={handlePush} disabled={!isSharePointConfigured() || spBusy !== null} className={btn.ghost}>
+              {spBusy === 'push'
+                ? spProgress
+                  ? `Pushing ${spProgress.done}/${spProgress.total}…`
+                  : 'Pushing…'
+                : 'Push to SharePoint'}
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-400">
+            Pull upserts SharePoint's entries into this browser by id. Push creates or updates entries in SharePoint — it never deletes
+            there. Both prompt for sign-in the first time, per the configured auth mode.
+          </p>
+        </div>
       </Panel>
     </div>
   )

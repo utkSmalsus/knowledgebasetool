@@ -92,6 +92,8 @@ interface KbValue {
   addPortfolio: (name: string) => void
   removePortfolio: (name: string) => void
   resetToSeed: () => void
+  /** Upserts entries by id — used to merge in entries pulled from an external source (e.g. SharePoint). */
+  importEntries: (entries: Entry[]) => void
 
   // trust layer
   submitForReview: (entryId: string, reviewer?: string) => void
@@ -245,6 +247,13 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
     // entries keep their portfolio string even if removed from the list — same "orphan, don't cascade" rule as categories
 
     resetToSeed: () => setState(emptyPersisted()),
+
+    importEntries: (incoming) =>
+      setState((s) => {
+        const byId = new Map(s.entries.map((e) => [e.id, e]))
+        for (const e of incoming) byId.set(e.id, e)
+        return { ...s, entries: Array.from(byId.values()) }
+      }),
 
     // -------------------- trust layer --------------------
 
