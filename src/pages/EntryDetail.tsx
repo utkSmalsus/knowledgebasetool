@@ -61,14 +61,15 @@ function DetailField({ def, value }: { def: FieldDef; value: string | string[] |
 export default function EntryDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { visible, categoryName, currentUser, remove, addComment, countView, markViewed, isSaved, toggleSaved } = useKb()
+  // Saved & recent is disabled — markViewed/isSaved/toggleSaved intentionally unused, see App.tsx, Layout.tsx, CommandPalette.tsx, Dashboard.tsx, Saved.tsx
+  const { visible, categoryName, currentUser, remove, addComment, countView /*, markViewed, isSaved, toggleSaved */ } = useKb()
   const entry = visible.find((e) => e.id === id)
   const [comment, setComment] = useState('')
 
   useEffect(() => {
     if (entry) {
       countView(entry.id)
-      markViewed(entry.id)
+      // markViewed(entry.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry?.id])
@@ -119,6 +120,7 @@ export default function EntryDetail() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 sm:shrink-0">
+                {/* Saved & recent is disabled — see App.tsx, Layout.tsx, CommandPalette.tsx, Dashboard.tsx, Saved.tsx
                 <button
                   onClick={() => toggleSaved(entry.id)}
                   title={isSaved(entry.id) ? 'Remove from saved' : 'Save for later'}
@@ -126,6 +128,7 @@ export default function EntryDetail() {
                 >
                   {isSaved(entry.id) ? '★ Saved' : '☆ Save'}
                 </button>
+                */}
                 {manage && (
                   <>
                     <Link to={`/edit/${entry.id}`} className={btn.ghost}>

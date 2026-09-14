@@ -91,12 +91,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             Explore
           </span>
         </NavLink>
+        {/* Saved & recent is disabled — see App.tsx, CommandPalette.tsx, EntryDetail.tsx, Dashboard.tsx, Saved.tsx
         <NavLink to="/saved" className={navCls} onClick={() => setMobileNavOpen(false)}>
           <span className="flex items-center gap-2">
             <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.saved}</span>
             Saved &amp; recent
           </span>
         </NavLink>
+        */}
         <NavLink to="/experts" className={navCls} onClick={() => setMobileNavOpen(false)}>
           <span className="flex items-center gap-2">
             <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.experts}</span>

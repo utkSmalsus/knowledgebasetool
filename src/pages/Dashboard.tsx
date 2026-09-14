@@ -31,7 +31,7 @@ function greeting(): string {
 }
 
 export default function Dashboard() {
-  const { visible, currentUser, recentlyViewedEntries } = useKb()
+  const { visible, currentUser /*, recentlyViewedEntries */ } = useKb()
   const navigate = useNavigate()
   const [heroQuery, setHeroQuery] = useState('')
   const internal = isInternal(currentUser.role)
@@ -47,11 +47,12 @@ export default function Dashboard() {
   const myAwaitingReview = mine.filter((e) => e.verification.state === 'in_review')
   const myNeedsUpdate = mine.filter((e) => e.verification.state === 'needs_update' || isExpired(e.verification))
 
-  const seedForRecs = mine.length ? mine : recentlyViewedEntries
+  // Saved & recent is disabled (see below) — recommendations now seed from authored work only.
+  const seedForRecs = mine /* .length ? mine : recentlyViewedEntries */
   const recommended = recommend(
     visible,
     seedForRecs,
-    new Set([...mine.map((e) => e.id), ...recentlyViewedEntries.map((e) => e.id)]),
+    new Set(mine.map((e) => e.id) /* , ...recentlyViewedEntries.map((e) => e.id) */),
     4,
   )
 
@@ -158,7 +159,8 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* ---------- continue where you left off ---------- */}
+      {/* ---------- continue where you left off ----------
+      Saved & recent is disabled — see Layout.tsx, App.tsx, CommandPalette.tsx, EntryDetail.tsx, Saved.tsx
       {recentlyViewedEntries.length > 0 && (
         <section className="space-y-3">
           <SectionTitle>Continue where you left off</SectionTitle>
@@ -169,6 +171,7 @@ export default function Dashboard() {
           </div>
         </section>
       )}
+      ---------------------------------------------------- */}
 
       {/* ---------- recommended ---------- */}
       {recommended.length > 0 && (

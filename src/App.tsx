@@ -9,7 +9,8 @@ import EntryDetail from './pages/EntryDetail'
 import EntryForm from './pages/EntryForm'
 import Experts from './pages/Experts'
 import ReviewQueue from './pages/ReviewQueue'
-import Saved from './pages/Saved'
+// Saved & recent is disabled — see Layout.tsx, CommandPalette.tsx, EntryDetail.tsx, Dashboard.tsx, Saved.tsx
+// import Saved from './pages/Saved'
 import { Role, canEdit, canReview } from './types'
 
 /**
@@ -57,7 +58,7 @@ export default function App() {
             </RequireRole>
           }
         />
-        <Route path="/saved" element={<Saved />} />
+        {/* <Route path="/saved" element={<Saved />} /> */}
         <Route path="/experts" element={<Experts />} />
         <Route
           path="/admin"

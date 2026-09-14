@@ -46,7 +46,8 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       show: canEdit(currentUser.role),
     },
     { id: 'review', label: 'Review queue', hint: 'Waiting for your review', icon: '🔍', run: () => go('/review'), show: canReview(currentUser.role) },
-    { id: 'saved', label: 'Saved knowledge', icon: '🔖', run: () => go('/saved'), show: true },
+    // Saved & recent is disabled — see App.tsx, Layout.tsx, EntryDetail.tsx, Dashboard.tsx, Saved.tsx
+    // { id: 'saved', label: 'Saved knowledge', icon: '🔖', run: () => go('/saved'), show: true },
     { id: 'experts', label: 'Find an expert', icon: '🧑‍💻', run: () => go('/experts'), show: true },
     { id: 'browse', label: 'Browse everything', icon: '🗂️', run: () => go('/browse'), show: true },
     { id: 'settings', label: 'Admin settings', icon: '⚙️', run: () => go('/admin'), show: currentUser.role === 'admin' },
