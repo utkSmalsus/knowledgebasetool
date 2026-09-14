@@ -4,6 +4,8 @@ import { useToast } from '../components/Toast'
 import { computeHealth } from '../kb/health'
 import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
 import { isSharePointConfigured, sharepointConfig } from '../kb/sharepoint/config'
+import { SpFieldInfo, getDistinctFieldValues, getListFields } from '../kb/sharepoint/client'
+import { provisionKnowledgeBaseList } from '../kb/sharepoint/provision'
 import { pullEntriesFromSharePoint, pushEntriesToSharePoint } from '../kb/sharepoint/sync'
 import { useKb } from '../kb/store'
 import { Category, isExpired } from '../types'
@@ -16,8 +18,62 @@ export default function Admin() {
   const [newParent, setNewParent] = useState('')
   const [newPortfolio, setNewPortfolio] = useState('')
   const toast = useToast()
-  const [spBusy, setSpBusy] = useState<'pull' | 'push' | null>(null)
+  const [spBusy, setSpBusy] = useState<'pull' | 'push' | 'provision' | null>(null)
   const [spProgress, setSpProgress] = useState<{ done: number; total: number } | null>(null)
+  const [provisionStep, setProvisionStep] = useState('')
+
+  const handleProvision = async () => {
+    setSpBusy('provision')
+    setProvisionStep('')
+    try {
+      await provisionKnowledgeBaseList((step, done, total) => {
+        setProvisionStep(total > 1 ? `${step} (${done}/${total})` : step)
+      })
+      toast(`"${sharepointConfig.listName}" is ready in SharePoint.`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Provisioning failed.', 'error')
+    } finally {
+      setSpBusy(null)
+      setProvisionStep('')
+    }
+  }
+  const [inspectListTitle, setInspectListTitle] = useState('Master Tasks')
+  const [inspectResult, setInspectResult] = useState<{ list: string; fields: SpFieldInfo[] } | null>(null)
+  const [inspectBusy, setInspectBusy] = useState(false)
+  const [sampleListTitle, setSampleListTitle] = useState('Master Tasks')
+  const [sampleField, setSampleField] = useState('Item_x0020_Type')
+  const [sampleResult, setSampleResult] = useState<{ list: string; field: string; values: { value: string; count: number }[] } | null>(
+    null,
+  )
+  const [sampleBusy, setSampleBusy] = useState(false)
+
+  const handleInspect = async () => {
+    if (!inspectListTitle.trim()) return
+    setInspectBusy(true)
+    setInspectResult(null)
+    try {
+      const fields = await getListFields(inspectListTitle.trim())
+      setInspectResult({ list: inspectListTitle.trim(), fields })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not read that list’s schema.', 'error')
+    } finally {
+      setInspectBusy(false)
+    }
+  }
+
+  const handleSample = async () => {
+    if (!sampleListTitle.trim() || !sampleField.trim()) return
+    setSampleBusy(true)
+    setSampleResult(null)
+    try {
+      const values = await getDistinctFieldValues(sampleListTitle.trim(), sampleField.trim())
+      setSampleResult({ list: sampleListTitle.trim(), field: sampleField.trim(), values })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not read that field’s values.', 'error')
+    } finally {
+      setSampleBusy(false)
+    }
+  }
 
   const handlePull = async () => {
     setSpBusy('pull')
@@ -36,7 +92,7 @@ export default function Admin() {
   const handlePush = async () => {
     setSpBusy('push')
     try {
-      await pushEntriesToSharePoint(entries, (done, total) => setSpProgress({ done, total }))
+      await pushEntriesToSharePoint(entries, users, (done, total) => setSpProgress({ done, total }))
       toast(`Pushed ${entries.length} entries to SharePoint.`, 'success')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Push to SharePoint failed.', 'error')
@@ -365,6 +421,9 @@ export default function Admin() {
           )}
 
           <div className="flex flex-wrap items-center gap-2">
+            <button onClick={handleProvision} disabled={!isSharePointConfigured() || spBusy !== null} className={btn.primary}>
+              {spBusy === 'provision' ? provisionStep || 'Provisioning…' : `Provision "${sharepointConfig.listName}" list`}
+            </button>
             <button onClick={handlePull} disabled={!isSharePointConfigured() || spBusy !== null} className={btn.ghost}>
               {spBusy === 'pull' ? 'Pulling…' : 'Pull from SharePoint'}
             </button>
@@ -378,9 +437,105 @@ export default function Admin() {
           </div>
 
           <p className="text-xs text-slate-400">
+            Provision creates the "{sharepointConfig.listName}" list and its columns if they don't already exist (safe to click more than
+            once) — including Portfolio/Project as real Lookup columns into "Master Tasks", without ever modifying Master Tasks itself.
             Pull upserts SharePoint's entries into this browser by id. Push creates or updates entries in SharePoint — it never deletes
-            there. Both prompt for sign-in the first time, per the configured auth mode.
+            there. All three prompt for sign-in the first time, per the configured auth mode.
           </p>
+
+          <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <p className="text-xs font-semibold uppercase text-slate-400">Inspect a list's schema</p>
+            <p className="text-xs text-slate-400">
+              Read-only — fetches another list's real columns (name, type, and lookup target) so field mapping can be built against what
+              actually exists instead of guesses.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={inspectListTitle}
+                onChange={(e) => setInspectListTitle(e.target.value)}
+                placeholder="e.g. Master Tasks"
+                className={`${input} w-auto flex-1`}
+              />
+              <button onClick={handleInspect} disabled={!isSharePointConfigured() || inspectBusy} className={btn.ghost}>
+                {inspectBusy ? 'Reading…' : 'Inspect schema'}
+              </button>
+            </div>
+
+            {inspectResult && (
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 uppercase text-slate-400 dark:bg-slate-800/60">
+                    <tr>
+                      <th className="px-3 py-2">Title</th>
+                      <th className="px-3 py-2">Internal name</th>
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Lookup list</th>
+                      <th className="px-3 py-2">Lookup field</th>
+                      <th className="px-3 py-2">Required</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {inspectResult.fields.map((f) => (
+                      <tr key={f.internalName}>
+                        <td className="px-3 py-1.5">{f.title}</td>
+                        <td className="px-3 py-1.5 font-mono">{f.internalName}</td>
+                        <td className="px-3 py-1.5">{f.type}</td>
+                        <td className="px-3 py-1.5">{f.lookupList ?? '—'}</td>
+                        <td className="px-3 py-1.5">{f.lookupField ?? '—'}</td>
+                        <td className="px-3 py-1.5">{f.required ? 'Yes' : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <p className="text-xs font-semibold uppercase text-slate-400">Sample a field's real values</p>
+            <p className="text-xs text-slate-400">
+              Read-only — distinct values (with counts) of one field across every item in a list, e.g. to see what Item_x0020_Type
+              actually contains instead of guessing from application code.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={sampleListTitle}
+                onChange={(e) => setSampleListTitle(e.target.value)}
+                placeholder="List title, e.g. Master Tasks"
+                className={`${input} w-auto flex-1`}
+              />
+              <input
+                value={sampleField}
+                onChange={(e) => setSampleField(e.target.value)}
+                placeholder="Field internal name, e.g. Item_x0020_Type"
+                className={`${input} w-auto flex-1`}
+              />
+              <button onClick={handleSample} disabled={!isSharePointConfigured() || sampleBusy} className={btn.ghost}>
+                {sampleBusy ? 'Reading…' : 'Sample values'}
+              </button>
+            </div>
+
+            {sampleResult && (
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 uppercase text-slate-400 dark:bg-slate-800/60">
+                    <tr>
+                      <th className="px-3 py-2">Value</th>
+                      <th className="px-3 py-2">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {sampleResult.values.map((v) => (
+                      <tr key={v.value}>
+                        <td className="px-3 py-1.5 font-mono">{v.value}</td>
+                        <td className="px-3 py-1.5 tabular-nums">{v.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </Panel>
     </div>

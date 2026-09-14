@@ -1,12 +1,14 @@
-import { Entry } from '../../types'
+import { Entry, User } from '../../types'
+import { ensureSiteUser, findItemIdByTitleAndType } from './client'
+import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPE, PROJECT_ITEM_TYPE } from './provision'
 
 /**
- * Maps Entry <-> a SharePoint list's fields. Simple scalar fields become
- * real columns; anything nested (arrays, objects) is round-tripped as a
- * JSON string in a "Multiple lines of text (plain text)" column — splitting
- * those into proper relational columns/lists is real future work, not
- * something to fake here. Column names below are what SHAREPOINT.md tells
- * you to create in the target list.
+ * Maps Entry <-> the knowledgebase list's fields (see provision.ts for the
+ * column definitions). Simple scalar fields become real columns; anything
+ * nested (arrays, objects) round-trips as a JSON string in a Note column.
+ * Portfolio/Project are real Lookup columns into Master Tasks — resolved by
+ * title-search here, never by creating anything there. TaggedUsers is a
+ * native multi-value Person field, resolved via each local User's `upn`.
  */
 
 function parseJsonField<T>(value: unknown, fallback: T): T {
@@ -18,7 +20,17 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
   }
 }
 
-export function entryToListItemFields(entry: Entry): Record<string, unknown> {
+export async function entryToListItemFields(entry: Entry, users: User[]): Promise<Record<string, unknown>> {
+  const [portfolioId, projectId] = await Promise.all([
+    entry.portfolio ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.portfolio, 'Item_x0020_Type', PORTFOLIO_ITEM_TYPE) : undefined,
+    entry.project ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.project, 'Item_x0020_Type', PROJECT_ITEM_TYPE) : undefined,
+  ])
+
+  const taggedUpns = (entry.taggedUsers ?? [])
+    .map((name) => users.find((u) => u.name === name)?.upn)
+    .filter((upn): upn is string => !!upn)
+  const taggedUserIds = (await Promise.all(taggedUpns.map((upn) => ensureSiteUser(upn)))).filter((id): id is number => id !== undefined)
+
   return {
     Title: entry.title,
     EntryId: entry.id,
@@ -27,9 +39,10 @@ export function entryToListItemFields(entry: Entry): Record<string, unknown> {
     Content: entry.content,
     Category: entry.category,
     Stage: entry.stage ?? '',
-    Portfolio: entry.portfolio ?? '',
-    Project: entry.project ?? '',
+    PortfolioId: portfolioId,
+    ProjectId: projectId,
     Task: entry.task ?? '',
+    // TaskListTitle / TaskItemId are set once the cross-list task picker (see SHAREPOINT.md) links an existing task — left blank otherwise.
     EntryStatus: entry.status,
     Visibility: entry.visibility,
     Author: entry.author,
@@ -37,9 +50,9 @@ export function entryToListItemFields(entry: Entry): Record<string, unknown> {
     CreatedAtIso: entry.createdAt,
     UpdatedAtIso: entry.updatedAt,
     Views: entry.views,
+    TaggedUsersId: { results: taggedUserIds },
     TagsJson: JSON.stringify(entry.tags),
     TechJson: JSON.stringify(entry.tech),
-    TaggedUsersJson: JSON.stringify(entry.taggedUsers ?? []),
     DetailsJson: JSON.stringify(entry.details),
     AttachmentsJson: JSON.stringify(entry.attachments),
     EvidenceJson: JSON.stringify(entry.evidence),
@@ -61,10 +74,10 @@ export function listItemToEntry(item: Record<string, any>): Entry {
     details: parseJsonField(item.DetailsJson, {}),
     stage: item.Stage || undefined,
     category: item.Category ?? '',
-    portfolio: item.Portfolio || undefined,
-    project: item.Project || undefined,
+    portfolio: item.Portfolio?.Title || undefined,
+    project: item.Project?.Title || undefined,
     task: item.Task || undefined,
-    taggedUsers: parseJsonField(item.TaggedUsersJson, []),
+    taggedUsers: (item.TaggedUsers?.results ?? []).map((u: any) => u.Title).filter(Boolean),
     tech: parseJsonField(item.TechJson, []),
     tags: parseJsonField(item.TagsJson, []),
     status: item.EntryStatus ?? 'draft',

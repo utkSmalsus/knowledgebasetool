@@ -1,4 +1,4 @@
-import { Entry } from '../../types'
+import { Entry, User } from '../../types'
 import { createItem, listAllItems, updateItem } from './client'
 import { entryToListItemFields, listItemToEntry } from './mapping'
 
@@ -12,15 +12,21 @@ export async function pullEntriesFromSharePoint(): Promise<Entry[]> {
  * Pushes local entries to SharePoint: updates items that already exist there
  * (matched on our own EntryId column, not SharePoint's numeric Id) and
  * creates the rest. Never deletes — a local entry removed from the app
- * still exists in SharePoint until removed there too.
+ * still exists in SharePoint until removed there too. `users` is the local
+ * user list, needed to resolve tagged people to SharePoint accounts (via
+ * their `upn`) — see mapping.ts.
  */
-export async function pushEntriesToSharePoint(entries: Entry[], onProgress?: (done: number, total: number) => void): Promise<void> {
-  const existing = await listAllItems()
+export async function pushEntriesToSharePoint(
+  entries: Entry[],
+  users: User[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  const existing = await listAllItems('$select=EntryId,Id')
   const spIdByEntryId = new Map(existing.map((item) => [item.EntryId as string, item.Id as number]))
 
   let done = 0
   for (const entry of entries) {
-    const fields = entryToListItemFields(entry)
+    const fields = await entryToListItemFields(entry, users)
     const spId = spIdByEntryId.get(entry.id)
     if (spId) {
       await updateItem(spId, fields)

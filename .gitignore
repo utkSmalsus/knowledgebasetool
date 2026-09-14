@@ -1,0 +1,4 @@
+# Local SharePoint/Azure AD config — real tenant values, never commit these.
+.env
+.env.local
+.env.*.local

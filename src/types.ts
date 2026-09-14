@@ -185,6 +185,8 @@ export interface User {
   name: string
   role: Role
   team?: string
+  /** User principal name / email — needed to resolve this person in SharePoint's People field. */
+  upn?: string
 }
 
 export const canEdit = (role: Role) => role === 'admin' || role === 'editor'
