@@ -12,6 +12,7 @@ import {
   Verification,
   VerificationChecks,
   Version,
+  Visibility,
   visibleTo,
 } from '../types'
 
@@ -97,7 +98,7 @@ interface KbValue {
 
   // trust layer
   submitForReview: (entryId: string, reviewer?: string) => void
-  approve: (entryId: string, opts: { checks: VerificationChecks; note?: string; reviewIntervalDays?: number }) => void
+  approve: (entryId: string, opts: { checks: VerificationChecks; note?: string; reviewIntervalDays?: number; visibility?: Visibility }) => void
   requestChanges: (entryId: string, note: string) => void
   reject: (entryId: string, note: string) => void
   markNeedsUpdate: (entryId: string, note: string) => void
@@ -289,7 +290,11 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
           nextReviewAt,
           checks: opts.checks,
         }
-        return { ...e, verification: logEvent(v, partial ? 'partially_approved' : 'approved', currentUser.name, opts.note) }
+        return {
+          ...e,
+          visibility: opts.visibility ?? e.visibility,
+          verification: logEvent(v, partial ? 'partially_approved' : 'approved', currentUser.name, opts.note),
+        }
       }),
 
     requestChanges: (entryId, note) =>

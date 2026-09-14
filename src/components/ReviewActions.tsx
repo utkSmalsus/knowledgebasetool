@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useKb } from '../kb/store'
-import { REVIEW_INTERVALS, VerificationChecks } from '../types'
+import { REVIEW_INTERVALS, Visibility, VerificationChecks } from '../types'
 import { useToast } from './Toast'
 import { EvidenceRow, Modal, btn, fmtDate, input } from './ui'
 
@@ -21,6 +21,13 @@ export function ReviewDialog({ entryId, title, open, onClose }: { entryId: strin
   const [checks, setChecks] = useState<VerificationChecks>(emptyChecks)
   const [interval, setInterval_] = useState('90d')
   const [note, setNote] = useState('')
+  const [visibility, setVisibility] = useState<Visibility>('internal')
+
+  // re-sync to the entry's actual visibility every time the dialog opens, since
+  // this component can stay mounted across different entries (see VerificationPanel)
+  useEffect(() => {
+    if (open) setVisibility(entry?.visibility ?? 'internal')
+  }, [open, entry?.visibility])
 
   const close = () => {
     setMode('approve')
@@ -33,7 +40,7 @@ export function ReviewDialog({ entryId, title, open, onClose }: { entryId: strin
 
   const submit = () => {
     if (mode === 'approve') {
-      approve(entryId, { checks, reviewIntervalDays: days, note: note.trim() || undefined })
+      approve(entryId, { checks, reviewIntervalDays: days, note: note.trim() || undefined, visibility })
       const allChecked = checks.contentReviewed && checks.evidenceChecked && checks.approachValidated
       toast(allChecked ? '✓ Verified' : '◑ Partially verified', 'success')
     } else if (mode === 'changes') {
@@ -127,6 +134,20 @@ export function ReviewDialog({ entryId, title, open, onClose }: { entryId: strin
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-2.5 text-sm dark:border-slate-800">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={visibility === 'client'}
+                onChange={(e) => setVisibility(e.target.checked ? 'client' : 'internal')}
+              />
+              <span>
+                Visible to clients
+                <span className="block text-xs font-normal text-slate-400">
+                  Sets this entry's visibility on approval — it still also needs to be Published to actually show up for client accounts.
+                </span>
+              </span>
             </label>
           </>
         )}
