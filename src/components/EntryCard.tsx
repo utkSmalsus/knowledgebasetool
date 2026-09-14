@@ -26,7 +26,7 @@ export default function EntryCard({
   return (
     <Link
       to={`/entry/${entry.id}`}
-      className={`block rounded-xl border border-l-4 border-slate-200 bg-white shadow-sm transition hover:-translate-y-px hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 ${
+      className={`block rounded-xl border border-l-4 border-slate-200 bg-white shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 ${
         tone[def.tone].border
       } ${compact ? 'p-3' : 'p-4'}`}
     >

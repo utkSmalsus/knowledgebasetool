@@ -26,10 +26,9 @@ interface Persisted {
   categories: Category[]
   portfolios: string[]
   role: Role
-  /** Per-user id -> saved/recently-viewed entry ids, and read-notification ids. All keyed by User.id. */
+  /** Per-user id -> saved/recently-viewed entry ids. Keyed by User.id. */
   saved: Record<string, string[]>
   recentlyViewed: Record<string, string[]>
-  readNotices: Record<string, string[]>
 }
 
 const emptyPersisted = (): Persisted => ({
@@ -39,7 +38,6 @@ const emptyPersisted = (): Persisted => ({
   role: 'admin',
   saved: {},
   recentlyViewed: {},
-  readNotices: {},
 })
 
 function load(): Persisted {
@@ -66,7 +64,6 @@ function load(): Persisted {
       role: parsed.role ?? 'admin',
       saved: parsed.saved ?? {},
       recentlyViewed: parsed.recentlyViewed ?? {},
-      readNotices: parsed.readNotices ?? {},
     }
   } catch {
     return fallback // corrupt or unavailable storage -> fall back to seed, don't blow up
@@ -111,15 +108,13 @@ interface KbValue {
   savedEntries: Entry[]
   recentlyViewedEntries: Entry[]
   markViewed: (entryId: string) => void
-  isNoticeRead: (id: string) => boolean
-  markNoticeRead: (id: string) => void
 }
 
 const Ctx = createContext<KbValue | undefined>(undefined)
 
 export function KbProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<Persisted>(load)
-  const { entries, categories, portfolios, role, saved, recentlyViewed, readNotices } = state
+  const { entries, categories, portfolios, role, saved, recentlyViewed } = state
 
   useEffect(() => {
     try {
@@ -346,15 +341,6 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
         const mine = s.recentlyViewed[currentUser.id] ?? []
         const next = [entryId, ...mine.filter((id) => id !== entryId)].slice(0, RECENT_CAP)
         return { ...s, recentlyViewed: { ...s.recentlyViewed, [currentUser.id]: next } }
-      }),
-
-    isNoticeRead: (id) => (readNotices[currentUser.id] ?? []).includes(id),
-
-    markNoticeRead: (id) =>
-      setState((s) => {
-        const mine = s.readNotices[currentUser.id] ?? []
-        if (mine.includes(id)) return s
-        return { ...s, readNotices: { ...s.readNotices, [currentUser.id]: [...mine, id] } }
       }),
   }
 

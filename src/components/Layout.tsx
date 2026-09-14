@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
-import { deriveNotifications } from '../kb/notifications'
 import { useKb } from '../kb/store'
 import { Role, canEdit, canReview } from '../types'
 import CommandPalette from './CommandPalette'
@@ -10,9 +9,17 @@ import { Kbd, btn, input, tone } from './ui'
 const DARK_KEY = 'hochhuth-kb.dark'
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 
+const NAV_ICON: Record<string, string> = {
+  overview: '⌂',
+  explore: '🧭',
+  saved: '★',
+  experts: '🎓',
+  review: '✓',
+  admin: '⚙',
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, setRole, visible, isNoticeRead, markNoticeRead } = useKb()
-  const navigate = useNavigate()
+  const { currentUser, setRole, visible } = useKb()
   const location = useLocation()
 
   // SPA navigation doesn't reset scroll on its own — every page should open at the top.
@@ -20,9 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     window.scrollTo(0, 0)
   }, [location.pathname])
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [noticesOpen, setNoticesOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const noticesRef = useRef<HTMLDivElement>(null)
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem(DARK_KEY) === '1'
@@ -52,30 +57,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (noticesRef.current && !noticesRef.current.contains(e.target as Node)) setNoticesOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [])
-
-  const notices = useMemo(() => deriveNotifications(visible, currentUser), [visible, currentUser])
-  const unread = notices.filter((n) => !isNoticeRead(n.id))
-
   const counts = ENTRY_TYPE_KEYS.map((k) => ({ key: k, n: visible.filter((e) => e.type === k).length }))
 
   const navCls = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm transition ${
+    `group flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-sm transition ${
       isActive
-        ? 'bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 font-medium text-white shadow-sm shadow-indigo-600/20'
         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
     }`
 
   const NavContent = (
     <>
       <Link to="/" className="flex items-center gap-2.5 px-4 py-4" onClick={() => setMobileNavOpen(false)}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-slate-900 to-slate-700 text-xs font-bold text-white dark:from-slate-100 dark:to-white dark:text-slate-900">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 text-xs font-bold text-white shadow-md shadow-indigo-500/30">
           HC
         </span>
         <span className="text-sm font-semibold leading-tight">
@@ -86,20 +80,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <nav className="space-y-0.5 px-3">
         <NavLink to="/" end className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Overview
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.overview}</span>
+            Overview
+          </span>
         </NavLink>
         <NavLink to="/browse" className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Explore
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.explore}</span>
+            Explore
+          </span>
         </NavLink>
         <NavLink to="/saved" className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Saved &amp; recent
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.saved}</span>
+            Saved &amp; recent
+          </span>
         </NavLink>
         <NavLink to="/experts" className={navCls} onClick={() => setMobileNavOpen(false)}>
-          Experts
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.experts}</span>
+            Experts
+          </span>
         </NavLink>
         {canReview(currentUser.role) && (
           <NavLink to="/review" className={navCls} onClick={() => setMobileNavOpen(false)}>
-            Review queue
+            <span className="flex items-center gap-2">
+              <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.review}</span>
+              Review queue
+            </span>
           </NavLink>
         )}
 
@@ -113,7 +122,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone[t.tone].solid}`} />
                 <span className="truncate">{t.label}</span>
               </span>
-              <span className="tabular-nums text-xs text-slate-400">{n}</span>
+              <span className="tabular-nums text-xs opacity-60">{n}</span>
             </NavLink>
           )
         })}
@@ -122,7 +131,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <>
             <div className="mx-1.5 my-2 border-t border-slate-200 dark:border-slate-800" />
             <NavLink to="/admin" className={navCls} onClick={() => setMobileNavOpen(false)}>
-              Admin
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.admin}</span>
+                Admin
+              </span>
             </NavLink>
           </>
         )}
@@ -189,49 +201,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Kbd>{isMac ? '⌘' : 'Ctrl'} K</Kbd>
             </span>
           </button>
-
-          <div className="relative" ref={noticesRef}>
-            <button
-              onClick={() => setNoticesOpen((o) => !o)}
-              className="relative rounded-lg border border-slate-300 p-2 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-label="Notifications"
-            >
-              🔔
-              {unread.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                  {unread.length}
-                </span>
-              )}
-            </button>
-            {noticesOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-80 origin-top-right animate-scale-in rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-                <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800">
-                  Notifications
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {notices.length === 0 && (
-                    <p className="px-4 py-6 text-center text-sm text-slate-400">You&rsquo;re all caught up.</p>
-                  )}
-                  {notices.slice(0, 12).map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => {
-                        markNoticeRead(n.id)
-                        setNoticesOpen(false)
-                        navigate(`/entry/${n.entryId}`)
-                      }}
-                      className={`flex w-full items-start gap-2 border-b border-slate-50 px-4 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/60 ${
-                        isNoticeRead(n.id) ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <span aria-hidden>{n.icon}</span>
-                      <span className="min-w-0 flex-1">{n.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
           <button onClick={() => setDark((d) => !d)} className={btn.ghost} title="Toggle dark mode">
             <span aria-hidden>{dark ? '☀' : '☾'}</span>

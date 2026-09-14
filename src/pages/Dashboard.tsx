@@ -21,6 +21,8 @@ import { useKb } from '../kb/store'
 import { Entry, canEdit, isExpired, isInternal } from '../types'
 import { useState } from 'react'
 
+const STAT_ACCENTS = ['from-indigo-500 to-violet-500', 'from-emerald-500 to-teal-500', 'from-amber-500 to-orange-500', 'from-sky-500 to-cyan-500']
+
 function greeting(): string {
   const h = new Date().getHours()
   if (h < 12) return 'Good morning'
@@ -69,30 +71,40 @@ export default function Dashboard() {
   return (
     <div className="space-y-10">
       {/* ---------- hero ---------- */}
-      <section className="animate-fade-up rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-6 py-10 text-center shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-950 sm:px-10 sm:py-14">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-          Everything your team knows, in one place.
-        </h1>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Discover research, decisions, solutions and expertise from across the organization.
-        </p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            navigate(`/browse?q=${encodeURIComponent(heroQuery)}`)
-          }}
-          className="mx-auto mt-6 flex max-w-xl items-center gap-2"
-        >
-          <input
-            value={heroQuery}
-            onChange={(e) => setHeroQuery(e.target.value)}
-            placeholder="Search knowledge, ask a question, or find an expert…"
-            className={`${input} py-3 text-sm shadow-sm`}
-          />
-          <button type="submit" className={`${btn.primary} px-5 py-3`}>
-            Search
-          </button>
-        </form>
+      <section className="relative animate-fade-up overflow-hidden rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-10 sm:py-14">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl dark:bg-indigo-500/10"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl dark:bg-fuchsia-500/10"
+        />
+        <div className="relative">
+          <h1 className="bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-2xl font-bold tracking-tight text-transparent dark:from-white dark:to-slate-400 sm:text-4xl">
+            Everything your team knows, in one place.
+          </h1>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-slate-500 dark:text-slate-400 sm:text-base">
+            Discover research, decisions, solutions and expertise from across the organization.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              navigate(`/browse?q=${encodeURIComponent(heroQuery)}`)
+            }}
+            className="mx-auto mt-6 flex max-w-xl items-center gap-2"
+          >
+            <input
+              value={heroQuery}
+              onChange={(e) => setHeroQuery(e.target.value)}
+              placeholder="Search knowledge, ask a question, or find an expert…"
+              className={`${input} py-3 text-sm shadow-sm`}
+            />
+            <button type="submit" className={`${btn.primary} px-5 py-3`}>
+              Search
+            </button>
+          </form>
+        </div>
       </section>
 
       {/* ---------- personal digest ---------- */}
@@ -116,12 +128,16 @@ export default function Dashboard() {
         </div>
 
         <div className={`grid gap-3 ${internal ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1'}`}>
-          {stats.map((s) => (
+          {stats.map((s, i) => (
             <Link
               key={s.label}
               to={s.to}
-              className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
+              className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
             >
+              <span
+                aria-hidden
+                className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${STAT_ACCENTS[i % STAT_ACCENTS.length]}`}
+              />
               <div className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{s.value}</div>
               <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{s.label}</div>
             </Link>
