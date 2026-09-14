@@ -22,6 +22,8 @@ function useUrlFilters(fixedType?: EntryTypeKey): [Filters, (patch: Partial<Filt
     category: params.get('category') ?? '',
     portfolio: params.get('portfolio') ?? '',
     project: params.get('project') ?? '',
+    task: params.get('task') ?? '',
+    taggedUser: params.get('taggedUser') ?? '',
     status: params.get('status') ?? '',
     visibility: params.get('visibility') ?? '',
     stage: params.get('stage') ?? '',
@@ -39,6 +41,8 @@ function useUrlFilters(fixedType?: EntryTypeKey): [Filters, (patch: Partial<Filt
     if (next.category) sp.set('category', next.category)
     if (next.portfolio) sp.set('portfolio', next.portfolio)
     if (next.project) sp.set('project', next.project)
+    if (next.task) sp.set('task', next.task)
+    if (next.taggedUser) sp.set('taggedUser', next.taggedUser)
     if (next.status) sp.set('status', next.status)
     if (next.visibility) sp.set('visibility', next.visibility)
     if (next.stage) sp.set('stage', next.stage)
@@ -55,12 +59,12 @@ export default function Browse() {
   const { key } = useParams<{ key?: string }>()
   const fixedType = key && (ENTRY_TYPE_KEYS as string[]).includes(key) ? (key as EntryTypeKey) : undefined
 
-  const { visible, categories, portfolios, currentUser } = useKb()
+  const { visible, categories, portfolios, users, currentUser } = useKb()
   const [f, patch] = useUrlFilters(fixedType)
   const internal = isInternal(currentUser.role)
   // starts open if a link already carries one of these filters, so it's never silently hiding an active choice
   const [moreOpen, setMoreOpen] = useState(
-    () => !!(f.category || f.portfolio || f.project || f.status || f.visibility || f.tag || f.author),
+    () => !!(f.category || f.portfolio || f.project || f.task || f.taggedUser || f.status || f.visibility || f.tag || f.author),
   )
 
   const results = useMemo(() => applyFilters(visible, f, categories), [visible, f, categories])
@@ -69,6 +73,10 @@ export default function Browse() {
   const allAuthors = useMemo(() => Array.from(new Set(visible.map((e) => e.author))).sort(), [visible])
   const allProjects = useMemo(
     () => Array.from(new Set(visible.map((e) => e.project).filter((p): p is string => !!p))).sort(),
+    [visible],
+  )
+  const allTasks = useMemo(
+    () => Array.from(new Set(visible.map((e) => e.task).filter((t): t is string => !!t))).sort(),
     [visible],
   )
   const activeStages = f.types.length === 1 ? typeDef(f.types[0]).stages : undefined
@@ -185,6 +193,17 @@ export default function Browse() {
                 </select>
               </FacetGroup>
 
+              <FacetGroup label="Task">
+                <select value={f.task} onChange={(e) => patch({ task: e.target.value })} className={input}>
+                  <option value="">All</option>
+                  {allTasks.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </FacetGroup>
+
               <FacetGroup label="Status">
                 <select value={f.status} onChange={(e) => patch({ status: e.target.value })} className={input}>
                   <option value="">All</option>
@@ -224,6 +243,19 @@ export default function Browse() {
                     {allAuthors.map((a) => (
                       <option key={a} value={a}>
                         {a}
+                      </option>
+                    ))}
+                  </select>
+                </FacetGroup>
+              )}
+
+              {internal && (
+                <FacetGroup label="Tagged">
+                  <select value={f.taggedUser} onChange={(e) => patch({ taggedUser: e.target.value })} className={input}>
+                    <option value="">All</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name}
                       </option>
                     ))}
                   </select>

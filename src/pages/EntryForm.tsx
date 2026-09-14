@@ -125,6 +125,7 @@ export default function EntryForm() {
   const def = typeDef(form.type)
 
   const allProjects = useMemo(() => Array.from(new Set(entries.map((e) => e.project).filter((p): p is string => !!p))).sort(), [entries])
+  const allTasks = useMemo(() => Array.from(new Set(entries.map((e) => e.task).filter((t): t is string => !!t))).sort(), [entries])
   const potentialReviewers = users.filter((u) => (u.role === 'admin' || u.role === 'editor') && u.name !== form.author)
 
   const set = <K extends keyof Entry>(key: K, value: Entry[K]) => setForm((f) => ({ ...f, [key]: value }))
@@ -136,6 +137,13 @@ export default function EntryForm() {
   }
 
   const toggleTech = (k: string) => setForm((f) => ({ ...f, tech: f.tech.includes(k) ? f.tech.filter((x) => x !== k) : [...f.tech, k] }))
+  const toggleTaggedUser = (name: string) =>
+    setForm((f) => ({
+      ...f,
+      taggedUsers: (f.taggedUsers ?? []).includes(name)
+        ? (f.taggedUsers ?? []).filter((x) => x !== name)
+        : [...(f.taggedUsers ?? []), name],
+    }))
 
   const addEvidence = (partial: Omit<Evidence, 'id'>) =>
     setForm((f) => ({ ...f, evidence: [...f.evidence, { ...partial, id: `ev${Date.now()}${Math.random().toString(36).slice(2, 5)}` }] }))
@@ -318,6 +326,22 @@ export default function EntryForm() {
               </Field>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Task" hint="e.g. a Jira/DevOps id">
+                <input
+                  list="task-suggestions"
+                  value={form.task ?? ''}
+                  onChange={(e) => set('task', e.target.value || undefined)}
+                  className={input}
+                />
+                <datalist id="task-suggestions">
+                  {allTasks.map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+              </Field>
+            </div>
+
             <Field label="Technology / domain">
               <div className="flex flex-wrap gap-1.5">
                 {TECH.map((t) => (
@@ -334,6 +358,27 @@ export default function EntryForm() {
                     {t.label}
                   </button>
                 ))}
+              </div>
+            </Field>
+
+            <Field label="Tag people" hint="Loop in other users on this entry">
+              <div className="flex flex-wrap gap-1.5">
+                {users
+                  .filter((u) => u.name !== currentUser.name)
+                  .map((u) => (
+                    <button
+                      type="button"
+                      key={u.id}
+                      onClick={() => toggleTaggedUser(u.name)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
+                        (form.taggedUsers ?? []).includes(u.name)
+                          ? 'bg-sky-600 text-white ring-sky-600'
+                          : 'bg-white text-slate-600 ring-slate-300 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700'
+                      }`}
+                    >
+                      {u.name}
+                    </button>
+                  ))}
               </div>
             </Field>
 

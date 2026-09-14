@@ -27,6 +27,8 @@ export function diffSnapshots(before: Version['snapshot'], after: Version['snaps
   push('Visibility', before.visibility, after.visibility)
   push('Portfolio', before.portfolio ?? '—', after.portfolio ?? '—')
   push('Project', before.project ?? '—', after.project ?? '—')
+  push('Task', before.task ?? '—', after.task ?? '—')
+  push('Tagged', (before.taggedUsers ?? []).join(', ') || '—', (after.taggedUsers ?? []).join(', ') || '—')
   push('Tags', before.tags.join(', '), after.tags.join(', '))
   push('Technology', before.tech.join(', '), after.tech.join(', '))
 

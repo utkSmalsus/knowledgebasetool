@@ -76,6 +76,8 @@ function make(e: {
   category: string
   portfolio?: string
   project?: string
+  task?: string
+  taggedUsers?: string[]
   tech?: string[]
   tags?: string[]
   status?: Entry['status']
@@ -105,6 +107,8 @@ function make(e: {
     category: e.category,
     portfolio: e.portfolio,
     project: e.project,
+    task: e.task,
+    taggedUsers: e.taggedUsers,
     tech: e.tech ?? [],
     tags: e.tags ?? [],
     status: e.status ?? 'published',
@@ -175,6 +179,8 @@ export const seedEntries: Entry[] = [
     category: 'clients',
     portfolio: 'Client Delivery',
     project: 'Müller AG Intranet',
+    task: 'MUE-412',
+    taggedUsers: ['Jonas Weber'],
     tech: ['spfx', 'sharepoint', 'react'],
     tags: ['mueller-ag', 'handover', 'intranet'],
     author: 'Priya Sharma',
@@ -232,6 +238,7 @@ export const seedEntries: Entry[] = [
     category: 'eng-frontend',
     portfolio: 'R&D & Innovation',
     project: 'Frontend Platform 2027',
+    taggedUsers: ['Jonas Weber'],
     tech: ['react', 'spfx', 'typescript'],
     tags: ['upgrade', 'react19', 'tech-debt'],
     stage: 'in_progress',
@@ -546,6 +553,8 @@ await execute();`,
     category: 'clients',
     portfolio: 'Client Delivery',
     project: 'Müller AG Intranet',
+    task: 'MUE-380',
+    taggedUsers: ['Priya Sharma', 'Jonas Weber'],
     tech: ['azure', 'security', 'spfx'],
     tags: ['mueller-ag', 'incident', 'secrets'],
     createdAt: '2026-02-19T08:00:00Z',
@@ -579,6 +588,8 @@ await execute();`,
     summary: 'A client app started throwing intermittent "connection timeout" errors from Redis during traffic spikes — root cause was connection-per-request, not the cache itself.',
     category: 'eng-backend',
     portfolio: 'Managed Services',
+    task: 'INC-2044',
+    taggedUsers: ['Priya Sharma'],
     tech: ['azure', 'node'],
     tags: ['redis', 'incident', 'connection-pooling'],
     createdAt: '2026-05-06T09:00:00Z',
@@ -671,6 +682,7 @@ export async function getCached(key) {
     summary: 'The release path we use for every client tenant, including the approval step people forget.',
     category: 'eng-sharepoint',
     portfolio: 'Internal Platform',
+    taggedUsers: ['Jonas Weber'],
     tech: ['spfx', 'devops', 'sharepoint'],
     tags: ['release', 'deployment'],
     createdAt: '2026-04-18T09:00:00Z',
@@ -706,6 +718,8 @@ export async function getCached(key) {
     summary: 'How to safely restart or fail over Azure Cache for Redis on a client production subscription without a full outage.',
     category: 'eng-backend',
     portfolio: 'Managed Services',
+    task: 'INC-2044',
+    taggedUsers: ['Priya Sharma'],
     tech: ['azure', 'devops'],
     tags: ['redis', 'runbook', 'on-call'],
     createdAt: '2026-05-12T09:00:00Z',

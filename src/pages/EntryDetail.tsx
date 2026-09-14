@@ -277,11 +277,26 @@ export default function EntryDetail() {
                 <Row label="Portfolio" value={entry.portfolio} to={`/browse?portfolio=${encodeURIComponent(entry.portfolio)}`} />
               )}
               {entry.project && <Row label="Project" value={entry.project} to={`/browse?project=${encodeURIComponent(entry.project)}`} />}
+              {entry.task && <Row label="Task" value={entry.task} to={`/browse?task=${encodeURIComponent(entry.task)}`} />}
               <Row label="Author" value={entry.author} />
               {entry.reviewer && <Row label="Reviewer" value={entry.reviewer} />}
               <Row label="Updated" value={fmtDate(entry.updatedAt)} />
               <Row label="Views" value={String(entry.views)} />
             </dl>
+            {entry.taggedUsers && entry.taggedUsers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-4 pt-3 text-sm dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Tagged:</span>
+                {entry.taggedUsers.map((name) => (
+                  <Link
+                    key={name}
+                    to={`/browse?taggedUser=${encodeURIComponent(name)}`}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium hover:underline dark:bg-slate-800"
+                  >
+                    {name}
+                  </Link>
+                ))}
+              </div>
+            )}
           </Panel>
 
           {related.length > 0 && (

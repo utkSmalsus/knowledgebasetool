@@ -148,6 +148,8 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
     visibility: e.visibility,
     portfolio: e.portfolio,
     project: e.project,
+    task: e.task,
+    taggedUsers: e.taggedUsers,
   })
 
   const logEvent = (v: Verification, action: ReviewAction, by: string, note?: string): Verification => ({

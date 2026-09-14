@@ -8,6 +8,8 @@ export interface Filters {
   category: string
   portfolio: string
   project: string
+  task: string
+  taggedUser: string
   status: string
   visibility: string
   stage: string
@@ -24,6 +26,8 @@ export const emptyFilters: Filters = {
   category: '',
   portfolio: '',
   project: '',
+  task: '',
+  taggedUser: '',
   status: '',
   visibility: '',
   stage: '',
@@ -42,7 +46,8 @@ function fields(entry: Entry): [string, number][] {
     [entry.summary, 5],
     [entry.tags.join(' '), 4],
     [entry.tech.map(techLabel).join(' ') + ' ' + entry.tech.join(' '), 4],
-    [(entry.portfolio ?? '') + ' ' + (entry.project ?? ''), 3],
+    [(entry.portfolio ?? '') + ' ' + (entry.project ?? '') + ' ' + (entry.task ?? ''), 3],
+    [(entry.taggedUsers ?? []).join(' '), 2],
     [typeDef(entry.type).label, 3],
     [entry.author, 2],
     [Object.values(entry.details).map(flatten).join(' '), 2],
@@ -101,6 +106,8 @@ export function applyFilters(entries: Entry[], f: Filters, categories: Category[
       if (branch && !branch.has(entry.category)) return false
       if (f.portfolio && entry.portfolio !== f.portfolio) return false
       if (f.project && entry.project !== f.project) return false
+      if (f.task && entry.task !== f.task) return false
+      if (f.taggedUser && !(entry.taggedUsers ?? []).includes(f.taggedUser)) return false
       if (f.status && entry.status !== f.status) return false
       if (f.visibility && entry.visibility !== f.visibility) return false
       if (f.stage && entry.stage !== f.stage) return false
@@ -132,5 +139,5 @@ export function relevantBecause(entry: Entry, query: string): string[] {
 export const activeFilterCount = (f: Filters) =>
   f.types.length +
   f.tech.length +
-  [f.category, f.portfolio, f.project, f.status, f.visibility, f.stage, f.tag, f.author].filter(Boolean).length +
+  [f.category, f.portfolio, f.project, f.task, f.taggedUser, f.status, f.visibility, f.stage, f.tag, f.author].filter(Boolean).length +
   (f.verifiedOnly ? 1 : 0)

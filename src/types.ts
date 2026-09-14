@@ -22,7 +22,19 @@ export interface Version {
   /** Enough of the entry to restore it, and to diff against the next version. */
   snapshot: Pick<
     Entry,
-    'title' | 'summary' | 'content' | 'details' | 'stage' | 'tags' | 'tech' | 'status' | 'visibility' | 'portfolio' | 'project'
+    | 'title'
+    | 'summary'
+    | 'content'
+    | 'details'
+    | 'stage'
+    | 'tags'
+    | 'tech'
+    | 'status'
+    | 'visibility'
+    | 'portfolio'
+    | 'project'
+    | 'task'
+    | 'taggedUsers'
   >
 }
 
@@ -139,6 +151,10 @@ export interface Entry {
   /** Cross-cutting taxonomy, independent of category/type. Both optional and free-form. */
   portfolio?: string
   project?: string
+  /** Related ticket or task, e.g. a Jira/DevOps id — free-form, same pattern as project. */
+  task?: string
+  /** Other people this entry is relevant to, beyond author/reviewer — e.g. "loop them in". */
+  taggedUsers?: string[]
   tech: string[]
   tags: string[]
   status: EntryStatus
