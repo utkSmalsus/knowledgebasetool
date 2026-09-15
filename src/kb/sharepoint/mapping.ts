@@ -45,12 +45,14 @@ export async function entryToListItemFields(entry: Entry, users: User[]): Promis
     // TaskListTitle / TaskItemId are set once the cross-list task picker (see SHAREPOINT.md) links an existing task — left blank otherwise.
     EntryStatus: entry.status,
     Visibility: entry.visibility,
-    Author: entry.author,
+    // Internal name is 'Author0' — SharePoint's built-in Created-By field already owns 'Author'.
+    Author0: entry.author,
     Reviewer: entry.reviewer ?? '',
     CreatedAtIso: entry.createdAt,
     UpdatedAtIso: entry.updatedAt,
     Views: entry.views,
-    TaggedUsersId: { results: taggedUserIds },
+    // Verbose OData needs the collection's type spelled out here, unlike a plain {results:[...]}.
+    TaggedUsersId: { __metadata: { type: 'Collection(Edm.Int32)' }, results: taggedUserIds },
     TagsJson: JSON.stringify(entry.tags),
     TechJson: JSON.stringify(entry.tech),
     DetailsJson: JSON.stringify(entry.details),
@@ -82,7 +84,7 @@ export function listItemToEntry(item: Record<string, any>): Entry {
     tags: parseJsonField(item.TagsJson, []),
     status: item.EntryStatus ?? 'draft',
     visibility: item.Visibility ?? 'internal',
-    author: item.Author ?? '',
+    author: item.Author0 ?? '',
     reviewer: item.Reviewer || undefined,
     createdAt: item.CreatedAtIso ?? new Date().toISOString(),
     updatedAt: item.UpdatedAtIso ?? new Date().toISOString(),

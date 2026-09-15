@@ -29,7 +29,9 @@ function fieldDefs(masterTasksGuid: string): FieldDef[] {
     { internalName: 'Stage', kind: 'Text' },
     { internalName: 'EntryStatus', kind: 'Text' },
     { internalName: 'Visibility', kind: 'Text' },
-    { internalName: 'Author', kind: 'Text' },
+    // 'Author' collides with SharePoint's built-in Created-By field's internal name, which
+    // silently renames ours to 'Author0' — requesting 'Author0' directly keeps this idempotent.
+    { internalName: 'Author0', displayName: 'Author', kind: 'Text' },
     { internalName: 'Reviewer', kind: 'Text' },
     { internalName: 'CreatedAtIso', kind: 'Text' },
     { internalName: 'UpdatedAtIso', kind: 'Text' },
