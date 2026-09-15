@@ -155,6 +155,24 @@ export async function getDistinctFieldValues(listTitle: string, fieldInternalNam
     .sort((a, b) => b.count - a.count)
 }
 
+/** Live title search on an arbitrary list — used by the Portfolio/Project/Task lookup pickers. */
+export async function searchListItemsByTitle(
+  listTitle: string,
+  query: string,
+  opts: { extraFilter?: string; top?: number; select?: string } = {},
+): Promise<Record<string, unknown>[]> {
+  const clauses = [`substringof('${odataLiteral(query)}',Title)`]
+  if (opts.extraFilter) clauses.push(opts.extraFilter)
+  const filter = clauses.join(' and ')
+  const data = await spFetch(
+    `${listPathByTitle(listTitle)}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}&$filter=${encodeURIComponent(
+      filter,
+    )}&$top=${opts.top ?? 25}&$orderby=Title`,
+    { method: 'GET' },
+  )
+  return data.d.results ?? []
+}
+
 export async function deleteItem(spItemId: number): Promise<void> {
   await spFetch(`${listPath()}/items(${spItemId})`, {
     method: 'DELETE',

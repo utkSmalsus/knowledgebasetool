@@ -42,7 +42,9 @@ export async function entryToListItemFields(entry: Entry, users: User[]): Promis
     PortfolioId: portfolioId,
     ProjectId: projectId,
     Task: entry.task ?? '',
-    // TaskListTitle / TaskItemId are set once the cross-list task picker (see SHAREPOINT.md) links an existing task — left blank otherwise.
+    // Set when Task was picked via the lookup popup (see LookupPicker/lookup.ts); blank for free-typed text.
+    TaskListTitle: entry.taskListTitle ?? '',
+    TaskItemId: entry.taskItemId,
     EntryStatus: entry.status,
     Visibility: entry.visibility,
     // Internal name is 'Author0' — SharePoint's built-in Created-By field already owns 'Author'.
@@ -79,6 +81,8 @@ export function listItemToEntry(item: Record<string, any>): Entry {
     portfolio: item.Portfolio?.Title || undefined,
     project: item.Project?.Title || undefined,
     task: item.Task || undefined,
+    taskListTitle: item.TaskListTitle || undefined,
+    taskItemId: item.TaskItemId ?? undefined,
     taggedUsers: (item.TaggedUsers?.results ?? []).map((u: any) => u.Title).filter(Boolean),
     tech: parseJsonField(item.TechJson, []),
     tags: parseJsonField(item.TagsJson, []),

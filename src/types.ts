@@ -153,6 +153,9 @@ export interface Entry {
   project?: string
   /** Related ticket or task, e.g. a Jira/DevOps id — free-form, same pattern as project. */
   task?: string
+  /** Which per-team SharePoint task list `task` was picked from, and its item id there — set when picked via the lookup popup, blank for free-typed text. */
+  taskListTitle?: string
+  taskItemId?: number
   /** Other people this entry is relevant to, beyond author/reviewer — e.g. "loop them in". */
   taggedUsers?: string[]
   tech: string[]

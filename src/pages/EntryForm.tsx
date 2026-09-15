@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import FeedbackWidget from '../components/FeedbackWidget'
+import LookupPicker, { LookupItem } from '../components/LookupPicker'
 import { useToast } from '../components/Toast'
 import {
   EvidenceRow,
@@ -17,6 +18,8 @@ import {
 } from '../components/ui'
 import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, TYPE_DECISION_HELPER, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
+import { isSharePointConfigured } from '../kb/sharepoint/config'
+import { searchPortfolios, searchProjects, searchTasks, TaskLookupResult } from '../kb/sharepoint/lookup'
 import { Attachment, Details, Entry, Evidence, EntryStatus, REVIEW_INTERVALS, Visibility } from '../types'
 
 const emptyEntry = (type: EntryTypeKey, author: string): Entry => {
@@ -121,8 +124,10 @@ export default function EntryForm() {
   const [step, setStep] = useState(0)
   const [fileError, setFileError] = useState('')
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')
+  const [activePicker, setActivePicker] = useState<'portfolio' | 'project' | 'task' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const def = typeDef(form.type)
+  const sharePointReady = isSharePointConfigured()
 
   const allProjects = useMemo(() => Array.from(new Set(entries.map((e) => e.project).filter((p): p is string => !!p))).sort(), [entries])
   const allTasks = useMemo(() => Array.from(new Set(entries.map((e) => e.task).filter((t): t is string => !!t))).sort(), [entries])
@@ -302,45 +307,102 @@ export default function EntryForm() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Portfolio">
-                <select value={form.portfolio ?? ''} onChange={(e) => set('portfolio', e.target.value || undefined)} className={input}>
-                  <option value="">—</option>
-                  {portfolios.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
+                {sharePointReady ? (
+                  <LookupField value={form.portfolio} placeholder="Search portfolios…" onOpen={() => setActivePicker('portfolio')} onClear={() => set('portfolio', undefined)} />
+                ) : (
+                  <select value={form.portfolio ?? ''} onChange={(e) => set('portfolio', e.target.value || undefined)} className={input}>
+                    <option value="">—</option>
+                    {portfolios.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </Field>
               <Field label="Project">
-                <input
-                  list="project-suggestions"
-                  value={form.project ?? ''}
-                  onChange={(e) => set('project', e.target.value || undefined)}
-                  className={input}
-                />
-                <datalist id="project-suggestions">
-                  {allProjects.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
+                {sharePointReady ? (
+                  <LookupField value={form.project} placeholder="Search projects…" onOpen={() => setActivePicker('project')} onClear={() => set('project', undefined)} />
+                ) : (
+                  <>
+                    <input
+                      list="project-suggestions"
+                      value={form.project ?? ''}
+                      onChange={(e) => set('project', e.target.value || undefined)}
+                      className={input}
+                    />
+                    <datalist id="project-suggestions">
+                      {allProjects.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </Field>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Task" hint="e.g. a Jira/DevOps id">
-                <input
-                  list="task-suggestions"
-                  value={form.task ?? ''}
-                  onChange={(e) => set('task', e.target.value || undefined)}
-                  className={input}
-                />
-                <datalist id="task-suggestions">
-                  {allTasks.map((t) => (
-                    <option key={t} value={t} />
-                  ))}
-                </datalist>
+              <Field label="Task" hint={sharePointReady ? 'Pick an existing task from a team list' : 'e.g. a Jira/DevOps id'}>
+                {sharePointReady ? (
+                  <LookupField
+                    value={form.task}
+                    placeholder="Search tasks…"
+                    onOpen={() => setActivePicker('task')}
+                    onClear={() => {
+                      set('task', undefined)
+                      set('taskListTitle', undefined)
+                      set('taskItemId', undefined)
+                    }}
+                  />
+                ) : (
+                  <>
+                    <input
+                      list="task-suggestions"
+                      value={form.task ?? ''}
+                      onChange={(e) => set('task', e.target.value || undefined)}
+                      className={input}
+                    />
+                    <datalist id="task-suggestions">
+                      {allTasks.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
               </Field>
             </div>
+
+            {activePicker === 'portfolio' && (
+              <LookupPicker
+                title="Select portfolio"
+                placeholder="Search Master Tasks…"
+                search={searchPortfolios}
+                onSelect={(item: LookupItem) => set('portfolio', item.title)}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
+            {activePicker === 'project' && (
+              <LookupPicker
+                title="Select project"
+                placeholder="Search Master Tasks…"
+                search={searchProjects}
+                onSelect={(item: LookupItem) => set('project', item.title)}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
+            {activePicker === 'task' && (
+              <LookupPicker
+                title="Add existing task"
+                placeholder="Search across team task lists…"
+                search={searchTasks}
+                onSelect={(item: TaskLookupResult) => {
+                  set('task', item.title)
+                  set('taskListTitle', item.listTitle)
+                  set('taskItemId', item.itemId)
+                }}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
 
             <Field label="Technology / domain">
               <div className="flex flex-wrap gap-1.5">
@@ -625,6 +687,26 @@ function EvidenceEditor({
           Add
         </button>
       </div>
+    </div>
+  )
+}
+
+function LookupField({ value, placeholder, onOpen, onClear }: { value?: string; placeholder: string; onOpen: () => void; onClear: () => void }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`${input} flex items-center justify-between text-left ${value ? '' : 'text-slate-400 dark:text-slate-500'}`}
+      >
+        <span className="truncate">{value || placeholder}</span>
+        <span className="shrink-0 text-xs text-slate-400">🔍</span>
+      </button>
+      {value && (
+        <button type="button" onClick={onClear} className="shrink-0 text-xs text-slate-400 hover:text-rose-600" title="Clear">
+          ✕
+        </button>
+      )}
     </div>
   )
 }
