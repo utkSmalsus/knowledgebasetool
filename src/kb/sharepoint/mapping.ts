@@ -1,6 +1,6 @@
 import { Entry, User } from '../../types'
 import { ensureSiteUser, findItemIdByTitleAndType } from './client'
-import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPE, PROJECT_ITEM_TYPE } from './provision'
+import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPES, PROJECT_ITEM_TYPES } from './provision'
 
 /**
  * Maps Entry <-> the knowledgebase list's fields (see provision.ts for the
@@ -22,8 +22,8 @@ function parseJsonField<T>(value: unknown, fallback: T): T {
 
 export async function entryToListItemFields(entry: Entry, users: User[]): Promise<Record<string, unknown>> {
   const [portfolioId, projectId] = await Promise.all([
-    entry.portfolio ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.portfolio, 'Item_x0020_Type', PORTFOLIO_ITEM_TYPE) : undefined,
-    entry.project ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.project, 'Item_x0020_Type', PROJECT_ITEM_TYPE) : undefined,
+    entry.portfolio ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.portfolio, 'Item_x0020_Type', PORTFOLIO_ITEM_TYPES) : undefined,
+    entry.project ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.project, 'Item_x0020_Type', PROJECT_ITEM_TYPES) : undefined,
   ])
 
   const taggedUpns = (entry.taggedUsers ?? [])

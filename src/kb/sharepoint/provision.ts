@@ -3,16 +3,20 @@ import { sharepointConfig } from './config'
 
 /** The existing list our Portfolio/Project columns look up into — never created or modified here. */
 export const MASTER_TASKS_LIST = 'Master Tasks'
-/** Item_x0020_Type values on Master Tasks that represent a Portfolio-level / Project-level row. */
-export const PORTFOLIO_ITEM_TYPE = 'Component'
-export const PROJECT_ITEM_TYPE = 'Project'
+/**
+ * Item_x0020_Type values on Master Tasks that make up the Portfolio branch (Component → SubComponent
+ * → Feature) and the Project branch (Project → Sprint/Cycle) — the same rows the Meeting tool's own
+ * Select Portfolio/Select Project pickers offer, not just the top-level Component/Project rows.
+ */
+export const PORTFOLIO_ITEM_TYPES = ['Component', 'SubComponent', 'Feature']
+export const PROJECT_ITEM_TYPES = ['Project', 'Sprint', 'Cycle']
 
 /**
  * The knowledgebase list's full column set. Simple scalar fields are plain
  * columns; anything nested (tags, versions, comments, verification
  * history…) round-trips as a JSON string in a Note column — see mapping.ts.
  * Portfolio/Project are real Lookup columns into Master Tasks (filtered to
- * Component/Project rows by our own picker, not by the column itself —
+ * the Component/Project branches by our own picker, not by the column itself —
  * SharePoint Lookup columns can't filter by a second field on their own).
  * Task isn't a Lookup: it references items across several separate
  * per-team Tasks lists (same pattern the Meeting tool uses), which a single

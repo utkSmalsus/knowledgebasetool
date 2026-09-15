@@ -265,14 +265,15 @@ export async function ensureFields(listTitle: string, defs: FieldDef[], onProgre
   }
 }
 
-/** Finds one item's SharePoint Id by exact Title + a second field match — used to resolve our local Portfolio/Project strings against Master Tasks, without creating anything there. */
+/** Finds one item's SharePoint Id by exact Title + a second field matching any of typeValues — used to resolve our local Portfolio/Project strings against Master Tasks, without creating anything there. */
 export async function findItemIdByTitleAndType(
   listTitle: string,
   title: string,
   typeFieldInternalName: string,
-  typeValue: string,
+  typeValues: string[],
 ): Promise<number | undefined> {
-  const filter = `Title eq '${odataLiteral(title)}' and ${typeFieldInternalName} eq '${odataLiteral(typeValue)}'`
+  const typeClause = typeValues.map((v) => `${typeFieldInternalName} eq '${odataLiteral(v)}'`).join(' or ')
+  const filter = `Title eq '${odataLiteral(title)}' and (${typeClause})`
   const data = await spFetch(`${listPathByTitle(listTitle)}/items?$select=Id&$filter=${encodeURIComponent(filter)}&$top=1`, { method: 'GET' })
   return (data.d.results ?? [])[0]?.Id as number | undefined
 }

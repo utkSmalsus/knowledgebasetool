@@ -1,5 +1,5 @@
 import { searchListItemsByTitle } from './client'
-import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPE, PROJECT_ITEM_TYPE } from './provision'
+import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPES, PROJECT_ITEM_TYPES } from './provision'
 
 export interface LookupResult {
   id: string
@@ -7,17 +7,19 @@ export interface LookupResult {
   subtitle?: string
 }
 
-async function searchMasterTasksByType(itemType: string, query: string): Promise<LookupResult[]> {
+/** itemTypes is a small set of known Item_x0020_Type constants (see provision.ts), never user input. */
+async function searchMasterTasksByTypes(itemTypes: string[], query: string): Promise<LookupResult[]> {
+  const typeClause = itemTypes.map((t) => `Item_x0020_Type eq '${t}'`).join(' or ')
   const items = await searchListItemsByTitle(MASTER_TASKS_LIST, query, {
-    extraFilter: `Item_x0020_Type eq '${itemType}'`,
-    select: 'Id,Title',
+    extraFilter: `(${typeClause})`,
+    select: 'Id,Title,Item_x0020_Type',
     top: 300,
   })
-  return items.map((i: any) => ({ id: String(i.Id), title: i.Title }))
+  return items.map((i: any) => ({ id: String(i.Id), title: i.Title, subtitle: i.Item_x0020_Type }))
 }
 
-export const searchPortfolios = (query: string) => searchMasterTasksByType(PORTFOLIO_ITEM_TYPE, query)
-export const searchProjects = (query: string) => searchMasterTasksByType(PROJECT_ITEM_TYPE, query)
+export const searchPortfolios = (query: string) => searchMasterTasksByTypes(PORTFOLIO_ITEM_TYPES, query)
+export const searchProjects = (query: string) => searchMasterTasksByTypes(PROJECT_ITEM_TYPES, query)
 
 /**
  * Real tasks live across several separate per-team lists on the same site (same pattern the
