@@ -11,6 +11,7 @@ async function searchMasterTasksByType(itemType: string, query: string): Promise
   const items = await searchListItemsByTitle(MASTER_TASKS_LIST, query, {
     extraFilter: `Item_x0020_Type eq '${itemType}'`,
     select: 'Id,Title',
+    top: 300,
   })
   return items.map((i: any) => ({ id: String(i.Id), title: i.Title }))
 }
@@ -34,7 +35,7 @@ export async function searchTasks(query: string): Promise<TaskLookupResult[]> {
   const perList = await Promise.all(
     TASK_LISTS.map(async (listTitle) => {
       try {
-        const items = await searchListItemsByTitle(listTitle, query, { select: 'Id,Title', top: 8 })
+        const items = await searchListItemsByTitle(listTitle, query, { select: 'Id,Title', top: 30 })
         return items.map((i: any) => ({ id: `${listTitle}:${i.Id}`, title: i.Title, subtitle: listTitle, listTitle, itemId: i.Id as number }))
       } catch {
         return [] // a list that doesn't exist on this tenant/site shouldn't break the others

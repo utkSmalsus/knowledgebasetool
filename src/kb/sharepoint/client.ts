@@ -155,19 +155,22 @@ export async function getDistinctFieldValues(listTitle: string, fieldInternalNam
     .sort((a, b) => b.count - a.count)
 }
 
-/** Live title search on an arbitrary list — used by the Portfolio/Project/Task lookup pickers. */
+/**
+ * Live title search on an arbitrary list — used by the Portfolio/Project/Task lookup pickers.
+ * An empty query lists everything (still respecting extraFilter/top) so the picker can show the
+ * full set scrollable, same as the Meeting tool, rather than requiring a search first.
+ */
 export async function searchListItemsByTitle(
   listTitle: string,
   query: string,
   opts: { extraFilter?: string; top?: number; select?: string } = {},
 ): Promise<Record<string, unknown>[]> {
-  const clauses = [`substringof('${odataLiteral(query)}',Title)`]
+  const clauses: string[] = []
+  if (query.trim()) clauses.push(`substringof('${odataLiteral(query.trim())}',Title)`)
   if (opts.extraFilter) clauses.push(opts.extraFilter)
-  const filter = clauses.join(' and ')
+  const filter = clauses.length ? `&$filter=${encodeURIComponent(clauses.join(' and '))}` : ''
   const data = await spFetch(
-    `${listPathByTitle(listTitle)}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}&$filter=${encodeURIComponent(
-      filter,
-    )}&$top=${opts.top ?? 25}&$orderby=Title`,
+    `${listPathByTitle(listTitle)}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}${filter}&$top=${opts.top ?? 25}&$orderby=Title`,
     { method: 'GET' },
   )
   return data.d.results ?? []

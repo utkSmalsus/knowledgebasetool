@@ -37,28 +37,27 @@ export default function LookupPicker<T extends LookupItem>({
   }, [])
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([])
-      setError('')
-      return
-    }
     let cancelled = false
     setLoading(true)
-    const t = setTimeout(() => {
-      search(query.trim())
-        .then((r) => {
-          if (!cancelled) {
-            setResults(r)
-            setError('')
-          }
-        })
-        .catch((e) => {
-          if (!cancelled) setError(e instanceof Error ? e.message : 'Search failed.')
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-    }, 300)
+    // No debounce on the initial (empty-query) load — show the full list right away, same as the Meeting tool.
+    const t = setTimeout(
+      () => {
+        search(query.trim())
+          .then((r) => {
+            if (!cancelled) {
+              setResults(r)
+              setError('')
+            }
+          })
+          .catch((e) => {
+            if (!cancelled) setError(e instanceof Error ? e.message : 'Search failed.')
+          })
+          .finally(() => {
+            if (!cancelled) setLoading(false)
+          })
+      },
+      query ? 300 : 0,
+    )
     return () => {
       cancelled = true
       clearTimeout(t)
@@ -82,12 +81,9 @@ export default function LookupPicker<T extends LookupItem>({
         </div>
 
         <div className="max-h-80 overflow-y-auto p-2">
-          {query.trim().length < 2 && <p className="p-3 text-xs text-slate-400">Type at least 2 characters to search.</p>}
-          {loading && <p className="p-3 text-xs text-slate-400">Searching…</p>}
+          {loading && results.length === 0 && <p className="p-3 text-xs text-slate-400">Loading…</p>}
           {error && <p className="p-3 text-xs text-rose-600">{error}</p>}
-          {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
-            <p className="p-3 text-xs text-slate-400">No matches.</p>
-          )}
+          {!loading && !error && results.length === 0 && <p className="p-3 text-xs text-slate-400">No matches.</p>}
           <ul className="space-y-0.5">
             {results.map((r) => (
               <li key={r.id}>
