@@ -21,7 +21,7 @@ export function needsAttention(entries: Entry[], now = Date.now()): { entry: Ent
       out.push({ entry: e, reason: 'Verification expired — due for re-review' })
     }
 
-    if ((e.type === 'research' || e.type === 'ai_research') && e.stage === 'in_progress' && daysSince(e.updatedAt, now) > 45) {
+    if (e.type === 'research' && e.stage === 'in_progress' && daysSince(e.updatedAt, now) > 45) {
       out.push({ entry: e, reason: `Research stalled — no update in ${daysSince(e.updatedAt, now)} days` })
     }
 

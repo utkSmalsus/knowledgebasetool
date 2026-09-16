@@ -133,8 +133,8 @@ export default function EntryForm() {
   const { entries, categories, portfolios, users, save, submitForReview, currentUser } = useKb()
   const existing = id ? entries.find((e) => e.id === id) : undefined
 
-  const [form, setForm] = useState<Entry>(() => existing ?? emptyEntry('article', currentUser.name))
-  const [tagInput, setTagInput] = useState((existing ?? emptyEntry('article', currentUser.name)).tags.join(', '))
+  const [form, setForm] = useState<Entry>(() => existing ?? emptyEntry('kt', currentUser.name))
+  const [tagInput, setTagInput] = useState((existing ?? emptyEntry('kt', currentUser.name)).tags.join(', '))
   const [step, setStep] = useState(0)
   const [fileError, setFileError] = useState('')
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')

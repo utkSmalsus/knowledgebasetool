@@ -10,7 +10,6 @@ const DARK_KEY = 'hochhuth-kb.dark'
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 
 const NAV_ICON: Record<string, string> = {
-  overview: '⌂',
   explore: '🧭',
   saved: '★',
   experts: '🎓',
@@ -79,12 +78,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Link>
 
       <nav className="space-y-0.5 px-3">
-        <NavLink to="/" end className={navCls} onClick={() => setMobileNavOpen(false)}>
-          <span className="flex items-center gap-2">
-            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.overview}</span>
-            Overview
-          </span>
-        </NavLink>
         <NavLink to="/browse" className={navCls} onClick={() => setMobileNavOpen(false)}>
           <span className="flex items-center gap-2">
             <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.explore}</span>

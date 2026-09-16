@@ -4,12 +4,12 @@
 //
 // Taxonomy: exactly six top-level types, chosen so every entry answers one
 // question — "what is the PURPOSE of this knowledge?" — without overlap:
-//   Article      -> explain something
-//   Research     -> investigate something
-//   AI Research  -> investigate something AI/ML/LLM-related
-//   Decision     -> explain why we chose something
-//   Solution     -> explain how we solved a problem
-//   Runbook      -> explain how to perform an operational task
+//   Knowledge Transfer -> hand a system/project off to someone else
+//   Research           -> investigate something (its own Topic field says what domain)
+//   Decision           -> explain why we chose something
+//   Solution           -> explain how we solved a problem
+//   Runbook            -> explain how to perform an operational task
+//   Skill              -> a reusable skill file, tagged with what it's for
 // Don't add a 7th type for an edge case — stretch the closest of these six
 // plus tags/category instead. See src/kb/migrate.ts for how the previous
 // (more fragmented) taxonomy maps onto this one.
@@ -53,9 +53,8 @@ export interface EntryTypeDef {
   fields: FieldDef[]
 }
 
-// Shared by Research and AI Research — same shape, same questions, just a
-// different domain. Defined once so the two stay identical on purpose.
 const RESEARCH_FIELDS: FieldDef[] = [
+  { key: 'topic', label: 'Topic', kind: 'text', required: true, hint: 'e.g. AI, Azure, SharePoint — what domain this research is about' },
   { key: 'question', label: 'Question / hypothesis', kind: 'markdown', required: true, hint: 'What were you trying to find out?' },
   { key: 'method', label: 'Methodology', kind: 'markdown', hint: 'How did you investigate it?' },
   { key: 'findings', label: 'Findings', kind: 'markdown', hint: 'What did you actually find?' },
@@ -74,13 +73,23 @@ const RESEARCH_STAGES: Stage[] = [
 ]
 
 export const ENTRY_TYPES = {
-  article: {
-    label: 'Article',
-    plural: 'Articles',
-    monogram: 'A',
+  kt: {
+    label: 'Knowledge Transfer',
+    plural: 'Knowledge Transfer',
+    monogram: 'KT',
     tone: 'blue',
-    blurb: 'General knowledge, guides, explanations and best practices.',
-    fields: [],
+    blurb: 'Handing a system or project off to someone else.',
+    fields: [
+      { key: 'handoverFrom', label: 'Handed over by', kind: 'text', half: true },
+      { key: 'handoverTo', label: 'Handed over to', kind: 'list', half: true, hint: 'Comma separated' },
+      { key: 'system', label: 'System / project', kind: 'text', half: true },
+      { key: 'handoverDate', label: 'Handover date', kind: 'date', half: true },
+      { key: 'scope', label: 'What is covered', kind: 'markdown' },
+      { key: 'notCovered', label: 'What is NOT covered', kind: 'markdown' },
+      { key: 'openRisks', label: 'Open risks / known issues', kind: 'markdown' },
+      { key: 'contacts', label: 'Escalation contacts', kind: 'list' },
+      { key: 'sessionLinks', label: 'Recordings & session notes', kind: 'links' },
+    ],
   },
 
   research: {
@@ -88,18 +97,7 @@ export const ENTRY_TYPES = {
     plural: 'Research',
     monogram: 'R',
     tone: 'teal',
-    blurb: 'Technical investigation, experiments and findings.',
-    stageLabel: 'Research status',
-    stages: RESEARCH_STAGES,
-    fields: RESEARCH_FIELDS,
-  },
-
-  ai_research: {
-    label: 'AI Research',
-    plural: 'AI Research',
-    monogram: 'AI',
-    tone: 'violet',
-    blurb: 'AI, ML and LLM research and experimentation.',
+    blurb: 'Technical investigation, experiments and findings — any domain, say which in Topic.',
     stageLabel: 'Research status',
     stages: RESEARCH_STAGES,
     fields: RESEARCH_FIELDS,
@@ -158,6 +156,19 @@ export const ENTRY_TYPES = {
       { key: 'rollback', label: 'Rollback / notes', kind: 'markdown' },
     ],
   },
+
+  skill: {
+    label: 'Skill',
+    plural: 'Skills',
+    monogram: 'SK',
+    tone: 'violet',
+    blurb: 'A reusable skill file — upload it as an attachment and say what it is for.',
+    fields: [
+      { key: 'skillName', label: 'Skill name', kind: 'text', required: true, half: true, hint: 'What is this skill for?' },
+      { key: 'skillDomain', label: 'Domain', kind: 'text', half: true, hint: 'e.g. SPFx, Azure, Data — where it applies' },
+      { key: 'usage', label: 'How to use it', kind: 'markdown', hint: 'What it does and when to reach for it' },
+    ],
+  },
 } satisfies Record<string, EntryTypeDef>
 
 export type EntryTypeKey = keyof typeof ENTRY_TYPES
@@ -173,12 +184,12 @@ export const stageFor = (key: EntryTypeKey, stage?: string): Stage | undefined =
 
 /** "I did X" -> "use type Y" — the self-service decision helper shown in the create flow. */
 export const TYPE_DECISION_HELPER: { prompt: string; type: EntryTypeKey }[] = [
-  { prompt: 'I am explaining something', type: 'article' },
+  { prompt: 'I am handing a system or project off to someone else', type: 'kt' },
   { prompt: 'I investigated or tested something', type: 'research' },
-  { prompt: 'I researched AI, ML or LLMs', type: 'ai_research' },
   { prompt: 'I need to document why we chose something', type: 'decision' },
   { prompt: 'I solved a specific problem', type: 'solution' },
   { prompt: 'Someone needs to follow steps to perform a task', type: 'runbook' },
+  { prompt: 'I have a reusable skill file to share', type: 'skill' },
 ]
 
 /** Technology / domain facet — the "is this an AI thing or an SPFx thing" axis. */

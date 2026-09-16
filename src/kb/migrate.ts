@@ -39,13 +39,18 @@ function carryOverLegacyFields(content: string, details: Details, keys: string[]
 }
 
 /**
- * The old taxonomy had 7 overlapping types (article, howto, research, kt,
- * decision, snippet, postmortem). This maps a raw stored entry — of any
- * vintage — onto the current 6-type taxonomy (article, research, ai_research,
- * decision, solution, runbook), carrying every field forward either into a
- * matching new field or, failing that, as a labelled section appended to the
- * body. Never throws, never drops data. Idempotent: an entry already on the
- * new taxonomy passes through unchanged.
+ * Maps a raw stored entry — of any taxonomy vintage — onto the current 6-type
+ * taxonomy (kt, research, decision, solution, runbook, skill), carrying every
+ * field forward either into a matching new field or, failing that, as a
+ * labelled section appended to the body. Never throws, never drops data.
+ * Idempotent: an entry already on the new taxonomy passes through unchanged.
+ *
+ * Two taxonomy generations back: article/howto/research/kt/decision/
+ * snippet/postmortem. One generation back: article/research/ai_research/
+ * decision/solution/runbook — Article was later retired in favour of a
+ * proper Knowledge Transfer type (Article had no fields of its own, so
+ * nothing is lost), and AI Research was folded into Research's own Topic
+ * field rather than kept as a separate type.
  */
 export function migrateEntryType(raw: any): Entry {
   const oldType = raw?.type
@@ -66,12 +71,18 @@ export function migrateEntryType(raw: any): Entry {
       break
 
     case 'kt':
-      type = 'article'
-      newDetails = {}
-      content = carryOverLegacyFields(content, details, [
-        'handoverFrom', 'handoverTo', 'system', 'handoverDate', 'scope', 'notCovered', 'openRisks', 'contacts', 'sessionLinks',
-      ])
-      stage = undefined // article has no stage vocabulary
+      type = 'kt'
+      newDetails = {
+        handoverFrom: details.handoverFrom,
+        handoverTo: details.handoverTo,
+        system: details.system,
+        handoverDate: details.handoverDate,
+        scope: details.scope,
+        notCovered: details.notCovered,
+        openRisks: details.openRisks,
+        contacts: details.contacts,
+        sessionLinks: details.sessionLinks,
+      }
       break
 
     case 'snippet':
@@ -89,12 +100,12 @@ export function migrateEntryType(raw: any): Entry {
       break
 
     case 'research':
-      // Research keeps its shape either way — it only splits by domain.
-      type = tech.includes('ai') ? 'ai_research' : 'research'
+      type = 'research'
       newDetails = {
-        question: details.objective,
+        topic: details.topic ?? (tech.includes('ai') ? 'AI' : undefined),
+        question: details.objective ?? details.question,
         method: details.method,
-        findings: details.outcome,
+        findings: details.outcome ?? details.findings,
         conclusion: details.conclusion,
         period: details.period,
         collaborators: details.collaborators,
@@ -103,16 +114,26 @@ export function migrateEntryType(raw: any): Entry {
       content = carryOverLegacyFields(content, details, ['references'])
       break
 
-    case 'article':
-    case 'decision':
     case 'ai_research':
+      // AI Research was merged into Research — same fields already, just record the domain it was.
+      type = 'research'
+      newDetails = { ...details, topic: details.topic ?? 'AI' }
+      break
+
+    case 'article':
+      type = 'kt'
+      newDetails = {}
+      break
+
+    case 'decision':
     case 'solution':
     case 'runbook':
+    case 'skill':
       type = oldType // already on the new taxonomy — nothing to do
       break
 
     default:
-      type = 'article' // unrecognised/corrupt legacy value — fall back to the safest generic type rather than crash
+      type = 'kt' // unrecognised/corrupt legacy value — fall back to the safest generic type rather than crash
   }
 
   return { ...raw, type, details: newDetails, content, stage }

@@ -170,10 +170,10 @@ const fb = (by: string, verdict: Feedback['verdict'], at: string, reason?: Feedb
 // than renamed — only `type` and `details` changed. See src/kb/migrate.ts for
 // how any real stored data with the old types gets migrated the same way.
 export const seedEntries: Entry[] = [
-  // ---------- Article (was: Knowledge transfer — a KT is a way knowledge is shared, not a type) ----------
+  // ---------- Knowledge Transfer ----------
   make({
     id: 'kt-mueller-spfx',
-    type: 'article',
+    type: 'kt',
     title: 'Müller AG intranet — SPFx web parts handover',
     summary: 'Reference doc for the five custom web parts on the Müller AG intranet, handed from Priya to Jonas ahead of parental leave.',
     category: 'clients',
@@ -211,7 +211,7 @@ export const seedEntries: Entry[] = [
   }),
   make({
     id: 'kt-billing-pipeline',
-    type: 'article',
+    type: 'kt',
     title: 'Azure Functions billing export pipeline — reference',
     summary: 'Handover reference for the nightly billing export (Functions + Service Bus + Blob), for the delivery team\'s L2 rota.',
     category: 'eng-cloud',
@@ -274,10 +274,10 @@ export const seedEntries: Entry[] = [
     }),
   }),
 
-  // ---------- AI Research (was: Research, split out because it's AI/ML-specific) ----------
+  // ---------- Research, AI topic ----------
   make({
     id: 'rd-ai-doc-summaries',
-    type: 'ai_research',
+    type: 'research',
     title: 'LLM summarisation of client SharePoint document libraries',
     summary: 'Can we generate reliable executive summaries of client document sets with a hosted LLM, without shipping client data outside the tenant?',
     category: 'eng-data',
@@ -293,6 +293,7 @@ export const seedEntries: Entry[] = [
     content:
       'Full write-up below. Headline: viable, but only with Azure OpenAI in the EU region and only for documents already classified non-confidential.',
     details: {
+      topic: 'AI',
       question: 'Determine whether an LLM can produce client-presentable summaries of SharePoint document libraries at acceptable cost and with data staying inside EU boundaries.',
       method:
         '1. Sampled 240 documents across three client libraries (contracts, project reports, technical specs).\n2. Extracted text via Graph API + `docx`/`pdf` parsing.\n3. Ran three configurations: Azure OpenAI (Sweden Central), the same model via the public API, and a local 8B model on a dev box.\n4. Two consultants blind-rated 60 summaries each on accuracy and usefulness (1–5).',
@@ -331,7 +332,7 @@ export const seedEntries: Entry[] = [
   }),
   make({
     id: 'rd-rag-sharepoint',
-    type: 'ai_research',
+    type: 'research',
     title: 'RAG over client SharePoint content with Azure AI Search',
     summary: 'Proposal: retrieval-augmented Q&A scoped to one client tenant, with permissions respected at query time.',
     category: 'eng-data',
@@ -346,6 +347,7 @@ export const seedEntries: Entry[] = [
     relatedEntryIds: ['rd-ai-doc-summaries', 'dr-ai-search'],
     content: 'Not started. Parking the shape of it here so we do not re-derive it next time a client asks.',
     details: {
+      topic: 'AI',
       question: 'Establish whether we can answer natural-language questions over a client document set while honouring per-user SharePoint permissions — the part every vendor demo skips.',
       method:
         'Planned: index with Azure AI Search, carry the SharePoint ACL trimming tokens into the index, filter at query time by the caller\'s group membership. Validate with a deliberately mixed-permission test library.',
@@ -358,7 +360,7 @@ export const seedEntries: Entry[] = [
   }),
   make({
     id: 'llm-support-summarization',
-    type: 'ai_research',
+    type: 'research',
     title: 'Comparing LLMs for customer-support summarisation',
     summary: 'Testing three hosted models for turning long client support threads into a 3-line handover summary for the on-call engineer.',
     category: 'eng-data',
@@ -374,6 +376,7 @@ export const seedEntries: Entry[] = [
     relatedEntryIds: ['rd-ai-doc-summaries'],
     content: 'Early days — first pass results below, nothing shipped yet.',
     details: {
+      topic: 'AI',
       question: 'Which model gives the on-call engineer the most useful 3-line "what happened and what\'s left" summary of a long support thread, without needing the full thread re-read?',
       method:
         '1. Pulled 30 anonymised closed support threads (5–40 messages each).\n2. Ran GPT-4o, Claude, and a smaller open-weights model with the same prompt template.\n3. Had two on-call engineers rate each summary for "would this have saved me time" (yes/no) without knowing which model produced it.',
@@ -742,10 +745,10 @@ export async function getCached(key) {
     }),
   }),
 
-  // ---------- Article ----------
+  // ---------- Knowledge Transfer ----------
   make({
     id: 'art-client-access',
-    type: 'article',
+    type: 'kt',
     title: 'What clients can see in our knowledge base',
     summary: 'The access rules for client accounts, in plain language — safe to share with clients.',
     category: 'clients',
@@ -768,7 +771,7 @@ export async function getCached(key) {
   }),
   make({
     id: 'art-versioning',
-    type: 'article',
+    type: 'kt',
     title: 'How we version and release SPFx solutions',
     summary: 'Version numbering, release branches, and what goes in release notes.',
     category: 'delivery',
@@ -798,7 +801,7 @@ export async function getCached(key) {
   }),
   make({
     id: 'art-archived-onboarding',
-    type: 'article',
+    type: 'kt',
     title: 'Onboarding: classic SharePoint customisation (retired)',
     summary: 'Superseded by the SPFx runbook. Kept for the two clients still on classic pages.',
     category: 'eng-sharepoint',
@@ -819,7 +822,7 @@ export async function getCached(key) {
   }),
   make({
     id: 'snip-kql-failed-funcs',
-    type: 'article',
+    type: 'kt',
     title: 'KQL: failed Azure Function executions in the last 24h, grouped by cause',
     summary: 'First query to run when the on-call channel lights up.',
     category: 'eng-cloud',
@@ -833,10 +836,10 @@ export async function getCached(key) {
       'Run this in the Logs blade of the Function App\'s Application Insights resource (Application Insights, KQL). Widen `ago(24h)` if the incident started earlier.\n\n```kql\nrequests\n| where timestamp > ago(24h)\n| where success == false\n| extend fn = tostring(customDimensions["FunctionName"])\n| summarize failures = count(),\n            firstSeen = min(timestamp),\n            lastSeen  = max(timestamp)\n        by fn, resultCode\n| order by failures desc\n```\n\n**Gotchas:** `customDimensions["FunctionName"]` is missing on cold-start failures — those show up with an empty `fn`. Sampling is on by default at high volume, so `failures` is an estimate, not a count.',
   }),
 
-  // ---------- Article: Redis caching (new — makes the taxonomy distinction obvious) ----------
+  // ---------- Knowledge Transfer: Redis caching ----------
   make({
     id: 'redis-caching-article',
-    type: 'article',
+    type: 'kt',
     title: 'How Redis caching works',
     summary: 'The cache-aside pattern, TTLs, and when reaching for Redis actually helps versus just adding complexity.',
     category: 'eng-backend',
@@ -862,7 +865,7 @@ export async function getCached(key) {
     }),
   }),
 
-  // ---------- Research: Redis vs Memcached (new — makes the taxonomy distinction obvious) ----------
+  // ---------- Research: Redis vs Memcached ----------
   make({
     id: 'redis-vs-memcached-research',
     type: 'research',
