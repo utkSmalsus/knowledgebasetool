@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { useKb } from '../kb/store'
 import { VERIFICATION_META } from '../kb/schema'
-import { Entry, canReview, isExpired } from '../types'
+import { Entry, isAssignedReviewer, isExpired, isOwner } from '../types'
 import { ReviewDialog } from './ReviewActions'
 import { useToast } from './Toast'
 import { Panel, btn, fmtDate, reviewDueLabel } from './ui'
 
-export default function VerificationPanel({ entry, canManage }: { entry: Entry; canManage: boolean }) {
+export default function VerificationPanel({ entry }: { entry: Entry }) {
   const { currentUser, submitForReview } = useKb()
   const toast = useToast()
   const [reviewOpen, setReviewOpen] = useState(false)
   const v = entry.verification
   const expired = isExpired(v)
-  const iAmReviewer = canReview(currentUser.role)
-  const isOwner = entry.author === currentUser.name || currentUser.role === 'admin'
+  const iAmReviewer = isAssignedReviewer(entry, currentUser)
+  const iAmOwner = isOwner(entry, currentUser)
   const recentHistory = [...v.history].reverse().slice(0, 3)
   const checkCount = v.checks ? Number(v.checks.contentReviewed) + Number(v.checks.evidenceChecked) + Number(v.checks.approachValidated) : 0
 
@@ -94,9 +94,9 @@ export default function VerificationPanel({ entry, canManage }: { entry: Entry; 
               Review now
             </button>
           )}
-          {v.state !== 'in_review' && v.state !== 'deprecated' && (canManage || isOwner || iAmReviewer) && (
+          {v.state !== 'in_review' && v.state !== 'deprecated' && iAmOwner && (
             <button onClick={submit} className={btn.ghost}>
-              {entry.author === currentUser.name ? 'Submit for review' : 'Request review'}
+              Submit for review
             </button>
           )}
         </div>

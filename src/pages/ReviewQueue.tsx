@@ -6,11 +6,12 @@ import { typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 
 export default function ReviewQueue() {
-  const { visible } = useKb()
+  const { visible, currentUser } = useKb()
   const [reviewing, setReviewing] = useState<string | null>(null)
 
+  // Only entries actually routed to me — not every submission in the tenant.
   const queue = visible
-    .filter((e) => e.verification.state === 'in_review')
+    .filter((e) => e.verification.state === 'in_review' && e.verification.reviewer === currentUser.name)
     .sort((a, b) => (a.verification.submittedAt ?? '').localeCompare(b.verification.submittedAt ?? ''))
 
   const reviewingEntry = queue.find((e) => e.id === reviewing)

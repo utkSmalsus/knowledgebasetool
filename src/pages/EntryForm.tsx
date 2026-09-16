@@ -4,6 +4,7 @@ import FeedbackWidget from '../components/FeedbackWidget'
 import LookupPicker, { LookupColumn } from '../components/LookupPicker'
 import { useToast } from '../components/Toast'
 import {
+  Empty,
   EvidenceRow,
   Markdown,
   Monogram,
@@ -28,7 +29,7 @@ import {
   TaskLookupResult,
   TeamMemberLookupResult,
 } from '../kb/sharepoint/lookup'
-import { Attachment, Details, Entry, Evidence, EntryStatus, REVIEW_INTERVALS, Visibility } from '../types'
+import { Attachment, Details, Entry, Evidence, EntryStatus, isOwner, REVIEW_INTERVALS, Visibility } from '../types'
 
 const emptyEntry = (type: EntryTypeKey, author: string): Entry => {
   const def = typeDef(type)
@@ -275,6 +276,12 @@ export default function EntryForm() {
   }
 
   const canGoNext = step === 1 ? form.title.trim().length > 0 : true
+
+  // Route-level enforcement — the Edit link is already hidden for non-owners, but a
+  // direct /edit/:id visit must not let anyone else touch someone else's entry.
+  if (id && (!existing || !isOwner(existing, currentUser))) {
+    return <Empty title="Not available" hint="Only the person who owns this entry can edit it." />
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-16">

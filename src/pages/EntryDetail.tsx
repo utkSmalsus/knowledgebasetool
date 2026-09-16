@@ -19,7 +19,7 @@ import {
 import { recommend } from '../kb/recommend'
 import { FieldDef, stageFor, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
-import { canEdit } from '../types'
+import { isOwner } from '../types'
 
 const WHEN_TO_USE_KEYS = ['recommendedWhen', 'avoidWhen', 'limitations']
 
@@ -83,7 +83,7 @@ export default function EntryDetail() {
   }
 
   const def = typeDef(entry.type)
-  const manage = canEdit(currentUser.role)
+  const manage = isOwner(entry, currentUser)
   const linkedRelated = visible.filter((e) => entry.relatedEntryIds.includes(e.id))
   const related = linkedRelated.length > 0 ? linkedRelated : recommend(visible, [entry], new Set([entry.id]), 4)
 
@@ -268,7 +268,7 @@ export default function EntryDetail() {
 
         {/* ---------------- context rail ---------------- */}
         <aside className="space-y-4">
-          <VerificationPanel entry={entry} canManage={manage} />
+          <VerificationPanel entry={entry} />
 
           <Panel title="Details">
             <dl className="space-y-2 p-4 text-sm">

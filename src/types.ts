@@ -197,6 +197,11 @@ export const isInternal = (role: Role) => role !== 'client'
 /** Anyone internal but the author can act as a reviewer — keeps the demo usable with 3 internal seats. */
 export const canReview = (role: Role) => role === 'admin' || role === 'editor'
 
+/** The only person who may edit/delete an entry, until the SharePoint group check lands. */
+export const isOwner = (entry: Entry, user: User) => entry.author === user.name
+/** The specific person this entry's current submission was routed to — not "any reviewer". */
+export const isAssignedReviewer = (entry: Entry, user: User) => entry.verification.reviewer === user.name
+
 /**
  * The one security boundary in this app. Client accounts may only ever see
  * published + client-visible entries. Everything that lists entries goes
