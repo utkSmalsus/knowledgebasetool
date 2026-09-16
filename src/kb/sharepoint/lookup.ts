@@ -21,12 +21,34 @@ export interface MasterTaskLookupResult extends LookupResult {
 }
 
 /**
+ * Compares two PortfolioStructureID codes (e.g. "C004-S15" vs "C004-S2") segment by segment,
+ * treating digit runs as numbers — the Meeting tool's own popups order rows by this code, not
+ * alphabetically by title (which would put "Admin Tool" (C002) before "Contact Database" (C001),
+ * and "S15" before "S2" as plain strings).
+ */
+function compareCodes(a: string, b: string): number {
+  const split = (s: string) => s.match(/\d+|\D+/g) ?? []
+  const as = split(a)
+  const bs = split(b)
+  for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+    const av = as[i] ?? ''
+    const bv = bs[i] ?? ''
+    if (av === bv) continue
+    const an = Number(av)
+    const bn = Number(bv)
+    if (!Number.isNaN(an) && !Number.isNaN(bn) && /^\d+$/.test(av) && /^\d+$/.test(bv)) return an - bn
+    return av.localeCompare(bv)
+  }
+  return 0
+}
+
+/**
  * Orders items so each parent is immediately followed by its own children (recursively),
  * annotating depth/parentId/hasChildren so the picker can indent and collapse them — the same
- * Component→SubComponent→Feature / Project→Sprint/Cycle grouping the Meeting tool's pickers
- * show via their expand arrows, rather than one flat alphabetical list.
+ * Component→SubComponent→Feature / Project→Sprint/Cycle grouping and code-based ordering the
+ * Meeting tool's pickers show, rather than one flat alphabetical-by-title list.
  */
-function orderByHierarchy<T extends { id: string; parentId?: string; title: string }>(
+function orderByHierarchy<T extends { id: string; parentId?: string; title: string; code?: string }>(
   items: T[],
 ): (T & { depth: number; hasChildren: boolean })[] {
   const byId = new Map(items.map((i) => [i.id, i]))
@@ -41,14 +63,14 @@ function orderByHierarchy<T extends { id: string; parentId?: string; title: stri
       roots.push(item)
     }
   }
-  const byTitle = (a: T, b: T) => a.title.localeCompare(b.title)
+  const compare = (a: T, b: T) => (a.code && b.code ? compareCodes(a.code, b.code) : a.title.localeCompare(b.title))
   const out: (T & { depth: number; hasChildren: boolean })[] = []
   const walk = (item: T, depth: number) => {
-    const kids = (childrenOf.get(item.id) ?? []).sort(byTitle)
+    const kids = (childrenOf.get(item.id) ?? []).sort(compare)
     out.push({ ...item, depth, hasChildren: kids.length > 0 })
     for (const child of kids) walk(child, depth + 1)
   }
-  for (const root of roots.sort(byTitle)) walk(root, 0)
+  for (const root of roots.sort(compare)) walk(root, 0)
   return out
 }
 
