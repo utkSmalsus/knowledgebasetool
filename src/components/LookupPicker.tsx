@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { input } from './ui'
 
 export interface LookupItem {
   id: string
   title: string
   subtitle?: string
+  /** Set when the result is a tree (see MasterTaskLookupResult) — enables indentation and collapse. */
+  depth?: number
+  parentId?: string
+  hasChildren?: boolean
 }
 
 export interface LookupColumn<T> {
@@ -23,11 +27,16 @@ export interface LookupColumn<T> {
  * Single-select (pass `onSelect`): click a row to pick it and close, e.g. Portfolio/Project/Task.
  * Multi-select (pass `onToggle` + `isSelected`): click a row to toggle it, popup stays open with
  * a Done button — e.g. tagging several people on an entry.
+ *
+ * Results with `depth`/`parentId`/`hasChildren` (the Master Tasks hierarchy) render as a
+ * collapsible tree — collapsed by default, one expand arrow per parent, same as the Meeting
+ * tool's own Select Portfolio/Select Project popups.
  */
 export default function LookupPicker<T extends LookupItem>({
   title,
   placeholder = 'Search…',
   subtitleLabel = 'Type',
+  leadingColumn,
   columns,
   search,
   onSelect,
@@ -39,6 +48,8 @@ export default function LookupPicker<T extends LookupItem>({
   placeholder?: string
   /** Header for the subtitle column (e.g. "Type" for Portfolio/Project, "List" for Task). */
   subtitleLabel?: string
+  /** One column shown before Title (e.g. the item's ID/code) — matches the real tool's column order. */
+  leadingColumn?: LookupColumn<T>
   /** Extra columns shown after Title/subtitle — e.g. Due date, % complete. */
   columns?: LookupColumn<T>[]
   search: (query: string) => Promise<T[]>
@@ -53,6 +64,7 @@ export default function LookupPicker<T extends LookupItem>({
   const [results, setResults] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const inputRef = useRef<HTMLInputElement>(null)
   const multiSelect = !!onToggle
 
@@ -71,6 +83,8 @@ export default function LookupPicker<T extends LookupItem>({
             if (!cancelled) {
               setResults(r)
               setError('')
+              // Collapsed by default — only top-level rows show until expanded, same as the Meeting tool.
+              setCollapsed(new Set(r.filter((item) => item.hasChildren).map((item) => item.id)))
             }
           })
           .catch((e) => {
@@ -87,6 +101,30 @@ export default function LookupPicker<T extends LookupItem>({
       clearTimeout(t)
     }
   }, [query, search])
+
+  const byId = useMemo(() => new Map(results.map((r) => [r.id, r])), [results])
+
+  const isVisible = (item: T): boolean => {
+    let current = item
+    while (current.parentId) {
+      if (collapsed.has(current.parentId)) return false
+      const parent = byId.get(current.parentId)
+      if (!parent) break
+      current = parent
+    }
+    return true
+  }
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const visibleResults = results.filter(isVisible)
 
   const rowClick = (item: T) => {
     if (multiSelect) {
@@ -122,6 +160,9 @@ export default function LookupPicker<T extends LookupItem>({
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
                   {multiSelect && <th className="w-8 px-4 py-2" />}
+                  {leadingColumn && (
+                    <th className="px-4 py-2 font-semibold">{leadingColumn.label}</th>
+                  )}
                   <th className="px-4 py-2 font-semibold">Title</th>
                   <th className="px-4 py-2 font-semibold">{subtitleLabel}</th>
                   {columns?.map((c) => (
@@ -132,8 +173,10 @@ export default function LookupPicker<T extends LookupItem>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {results.map((r) => {
+                {visibleResults.map((r) => {
                   const checked = !!isSelected?.(r)
+                  const depth = r.depth ?? 0
+                  const expanded = r.hasChildren && !collapsed.has(r.id)
                   return (
                     <tr
                       key={r.id}
@@ -145,8 +188,28 @@ export default function LookupPicker<T extends LookupItem>({
                           <input type="checkbox" checked={checked} readOnly className="pointer-events-none" />
                         </td>
                       )}
-                      <td className="max-w-xs truncate px-4 py-2" style={{ paddingLeft: `${1 + ((r as { depth?: number }).depth ?? 0) * 1.25}rem` }}>
-                        {r.title}
+                      {leadingColumn && (
+                        <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">{leadingColumn.render(r)}</td>
+                      )}
+                      <td className="max-w-xs truncate px-4 py-2">
+                        <span style={{ paddingLeft: `${depth * 1.25}rem` }} className="inline-flex items-center gap-1">
+                          {r.hasChildren ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleCollapsed(r.id)
+                              }}
+                              className="shrink-0 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                              aria-label={expanded ? 'Collapse' : 'Expand'}
+                            >
+                              {expanded ? '▾' : '▸'}
+                            </button>
+                          ) : (
+                            depth > 0 && <span className="w-3 shrink-0" />
+                          )}
+                          {r.title}
+                        </span>
                       </td>
                       <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">{r.subtitle}</td>
                       {columns?.map((c) => (

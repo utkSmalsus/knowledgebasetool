@@ -12,17 +12,23 @@ export interface MasterTaskLookupResult extends LookupResult {
   code?: string
   /** How deep this row sits under its parent (0 = top level) — used to indent it under its parent, same as the Meeting tool's expandable rows. */
   depth: number
+  /** This row's own parent id, if any — lets the picker hide/show a subtree when its ancestor is collapsed. */
+  parentId?: string
+  /** Whether this row has children — the picker only shows an expand arrow when this is true. */
+  hasChildren: boolean
   dueDate?: string
   percentComplete?: number
 }
 
 /**
  * Orders items so each parent is immediately followed by its own children (recursively),
- * annotating depth for indentation — the same Component→SubComponent→Feature /
- * Project→Sprint/Cycle grouping the Meeting tool's pickers show via their expand arrows,
- * rather than one flat alphabetical list.
+ * annotating depth/parentId/hasChildren so the picker can indent and collapse them — the same
+ * Component→SubComponent→Feature / Project→Sprint/Cycle grouping the Meeting tool's pickers
+ * show via their expand arrows, rather than one flat alphabetical list.
  */
-function orderByHierarchy<T extends { id: string; parentId?: string; title: string }>(items: T[]): (T & { depth: number })[] {
+function orderByHierarchy<T extends { id: string; parentId?: string; title: string }>(
+  items: T[],
+): (T & { depth: number; hasChildren: boolean })[] {
   const byId = new Map(items.map((i) => [i.id, i]))
   const childrenOf = new Map<string, T[]>()
   const roots: T[] = []
@@ -36,10 +42,11 @@ function orderByHierarchy<T extends { id: string; parentId?: string; title: stri
     }
   }
   const byTitle = (a: T, b: T) => a.title.localeCompare(b.title)
-  const out: (T & { depth: number })[] = []
+  const out: (T & { depth: number; hasChildren: boolean })[] = []
   const walk = (item: T, depth: number) => {
-    out.push({ ...item, depth })
-    for (const child of (childrenOf.get(item.id) ?? []).sort(byTitle)) walk(child, depth + 1)
+    const kids = (childrenOf.get(item.id) ?? []).sort(byTitle)
+    out.push({ ...item, depth, hasChildren: kids.length > 0 })
+    for (const child of kids) walk(child, depth + 1)
   }
   for (const root of roots.sort(byTitle)) walk(root, 0)
   return out

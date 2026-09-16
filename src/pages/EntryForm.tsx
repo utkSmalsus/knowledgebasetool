@@ -120,8 +120,8 @@ function DetailInput({ def, value, onChange }: { def: FieldDef; value: string | 
 
 const STEPS = ['Type', 'Title & summary', 'Content', 'Evidence', 'Owner & reviewer', 'Visibility & schedule', 'Preview'] as const
 
+const masterTaskIdColumn: LookupColumn<MasterTaskLookupResult> = { label: 'ID', render: (item) => item.code ?? '—' }
 const masterTaskColumns: LookupColumn<MasterTaskLookupResult>[] = [
-  { label: 'ID', render: (item) => item.code ?? '—' },
   { label: 'Due', render: (item) => (item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—') },
   { label: '% Complete', render: (item) => (item.percentComplete != null ? `${Math.round(item.percentComplete * 100)}%` : '—') },
 ]
@@ -391,6 +391,7 @@ export default function EntryForm() {
                 title="Select portfolio"
                 placeholder="Search Master Tasks…"
                 search={searchPortfolios}
+                leadingColumn={masterTaskIdColumn}
                 columns={masterTaskColumns}
                 onSelect={(item: MasterTaskLookupResult) => set('portfolio', item.title)}
                 onClose={() => setActivePicker(null)}
@@ -401,6 +402,7 @@ export default function EntryForm() {
                 title="Select project"
                 placeholder="Search Master Tasks…"
                 search={searchProjects}
+                leadingColumn={masterTaskIdColumn}
                 columns={masterTaskColumns}
                 onSelect={(item: MasterTaskLookupResult) => set('project', item.title)}
                 onClose={() => setActivePicker(null)}
