@@ -73,9 +73,64 @@ const readAsDataUrl = (file: File) =>
 
 const textareaCls = (kind: FieldDef['kind']) => `${input} ${kind === 'code' ? 'font-mono text-xs' : ''}`
 
-function DetailInput({ def, value, onChange }: { def: FieldDef; value: string | string[] | undefined; onChange: (v: string | string[]) => void }) {
+function DetailInput({
+  def,
+  value,
+  onChange,
+  sharePointReady,
+  onOpenPersonPicker,
+}: {
+  def: FieldDef
+  value: string | string[] | undefined
+  onChange: (v: string | string[]) => void
+  sharePointReady: boolean
+  onOpenPersonPicker: () => void
+}) {
   const rows = def.kind === 'code' ? 10 : def.kind === 'markdown' ? 5 : 2
 
+  if (def.kind === 'person' && sharePointReady) {
+    const name = (value as string) ?? ''
+    return <LookupField value={name} placeholder="Search team members…" onOpen={onOpenPersonPicker} onClear={() => onChange('')} />
+  }
+  if (def.kind === 'people' && sharePointReady) {
+    const names = Array.isArray(value) ? value : []
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {names.map((name) => (
+          <span
+            key={name}
+            className="flex items-center gap-1 rounded-full bg-sky-600 px-2.5 py-1 text-xs font-medium text-white ring-1 ring-inset ring-sky-600"
+          >
+            {name}
+            <button type="button" onClick={() => onChange(names.filter((n) => n !== name))} className="text-white/80 hover:text-white">
+              ✕
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          onClick={onOpenPersonPicker}
+          className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+        >
+          + Add
+        </button>
+      </div>
+    )
+  }
+  // No SharePoint configured — fall back to plain free-text input for 'person'/'people' too.
+  if (def.kind === 'person') {
+    return <input value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} className={input} />
+  }
+  if (def.kind === 'people') {
+    return (
+      <input
+        value={Array.isArray(value) ? value.join(', ') : ''}
+        onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+        placeholder="Comma separated"
+        className={input}
+      />
+    )
+  }
   if (def.kind === 'select') {
     return (
       <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} className={input}>
@@ -138,7 +193,9 @@ export default function EntryForm() {
   const [step, setStep] = useState(0)
   const [fileError, setFileError] = useState('')
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')
-  const [activePicker, setActivePicker] = useState<'portfolio' | 'project' | 'task' | 'people' | null>(null)
+  const [activePicker, setActivePicker] = useState<
+    'portfolio' | 'project' | 'task' | 'people' | { field: string; multi: boolean } | null
+  >(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const def = typeDef(form.type)
   const sharePointReady = isSharePointConfigured()
@@ -433,6 +490,36 @@ export default function EntryForm() {
                 onClose={() => setActivePicker(null)}
               />
             )}
+            {/* Any type's field can ask for a real person/people (see schema.ts's 'person'/'people' kinds) —
+                one shared picker here, driven by which field is currently open rather than one per field. */}
+            {activePicker !== null && typeof activePicker === 'object' && activePicker.multi && (
+              <LookupPicker
+                title="Select people"
+                placeholder="Search team members…"
+                subtitleLabel="Company"
+                search={searchTeamMembers}
+                isSelected={(item: TeamMemberLookupResult) => {
+                  const current = form.details[activePicker.field]
+                  return Array.isArray(current) && current.includes(item.title)
+                }}
+                onToggle={(item: TeamMemberLookupResult) => {
+                  const current = form.details[activePicker.field]
+                  const arr = Array.isArray(current) ? current : []
+                  setDetail(activePicker.field, arr.includes(item.title) ? arr.filter((n) => n !== item.title) : [...arr, item.title])
+                }}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
+            {activePicker !== null && typeof activePicker === 'object' && !activePicker.multi && (
+              <LookupPicker
+                title="Select person"
+                placeholder="Search team members…"
+                subtitleLabel="Company"
+                search={searchTeamMembers}
+                onSelect={(item: TeamMemberLookupResult) => setDetail(activePicker.field, item.title)}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
 
             <Field label="Technology / domain">
               <div className="flex flex-wrap gap-1.5">
@@ -516,7 +603,13 @@ export default function EntryForm() {
                   {def.fields.map((fd) => (
                     <div key={fd.key} className={fd.half ? '' : 'sm:col-span-2'}>
                       <Field label={fd.label} hint={fd.hint} required={fd.required}>
-                        <DetailInput def={fd} value={form.details[fd.key]} onChange={(v) => setDetail(fd.key, v)} />
+                        <DetailInput
+                          def={fd}
+                          value={form.details[fd.key]}
+                          onChange={(v) => setDetail(fd.key, v)}
+                          sharePointReady={sharePointReady}
+                          onOpenPersonPicker={() => setActivePicker({ field: fd.key, multi: fd.kind === 'people' })}
+                        />
                       </Field>
                     </div>
                   ))}

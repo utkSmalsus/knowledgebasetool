@@ -46,7 +46,7 @@ function DetailField({ def, value }: { def: FieldDef; value: string | string[] |
         ))}
       </ul>
     )
-  else if (def.kind === 'list') body = <p className="text-sm">{(value as string[]).join(', ')}</p>
+  else if (def.kind === 'list' || def.kind === 'people') body = <p className="text-sm">{(value as string[]).join(', ')}</p>
   else if (def.kind === 'date') body = <p className="text-sm">{fmtDate(value as string)}</p>
   else body = <p className="whitespace-pre-wrap text-sm">{value as string}</p>
 

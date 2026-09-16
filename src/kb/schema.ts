@@ -25,6 +25,8 @@ export type FieldKind =
   | 'list' // comma separated -> string[]
   | 'links' // one URL per line -> string[]
   | 'code'
+  | 'person' // one real team member, picked from SharePoint Task Users (falls back to free text when SharePoint isn't configured)
+  | 'people' // same, multi-select -> string[]
 
 export interface FieldDef {
   key: string
@@ -80,14 +82,14 @@ export const ENTRY_TYPES = {
     tone: 'blue',
     blurb: 'Handing a system or project off to someone else.',
     fields: [
-      { key: 'handoverFrom', label: 'Handed over by', kind: 'text', half: true },
-      { key: 'handoverTo', label: 'Handed over to', kind: 'list', half: true, hint: 'Comma separated' },
+      { key: 'handoverFrom', label: 'Handed over by', kind: 'person', half: true },
+      { key: 'handoverTo', label: 'Handed over to', kind: 'people', half: true },
       { key: 'system', label: 'System / project', kind: 'text', half: true },
       { key: 'handoverDate', label: 'Handover date', kind: 'date', half: true },
       { key: 'scope', label: 'What is covered', kind: 'markdown' },
       { key: 'notCovered', label: 'What is NOT covered', kind: 'markdown' },
       { key: 'openRisks', label: 'Open risks / known issues', kind: 'markdown' },
-      { key: 'contacts', label: 'Escalation contacts', kind: 'list' },
+      { key: 'contacts', label: 'Escalation contacts', kind: 'people' },
       { key: 'sessionLinks', label: 'Recordings & session notes', kind: 'links' },
     ],
   },
