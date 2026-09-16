@@ -383,3 +383,46 @@ export async function ensureSiteUser(loginNameOrEmail: string): Promise<number |
     return undefined
   }
 }
+
+// -------------------- document library (folders + file upload) --------------------
+
+export async function folderExists(serverRelativeUrl: string): Promise<boolean> {
+  try {
+    // GetFolderByServerRelativeUrl resolves to HTTP 200 with Exists:false for a missing folder
+    // rather than erroring — a request failure here means something else went wrong.
+    const data = await spFetch(`/GetFolderByServerRelativeUrl('${encodeURI(serverRelativeUrl)}')?$select=Exists`, { method: 'GET' })
+    return data.d.Exists === true
+  } catch {
+    return false
+  }
+}
+
+/** Creates `folderName` under `parentServerRelativeUrl` if it doesn't already exist — safe to call repeatedly. Returns the child's own server-relative url. */
+export async function ensureFolder(parentServerRelativeUrl: string, folderName: string): Promise<string> {
+  const target = `${parentServerRelativeUrl}/${folderName}`
+  if (!(await folderExists(target))) {
+    await spFetch(
+      `/GetFolderByServerRelativeUrl('${encodeURI(parentServerRelativeUrl)}')/folders/add('${encodeURIComponent(odataLiteral(folderName))}')`,
+      { method: 'POST' },
+    )
+  }
+  return target
+}
+
+export interface UploadedFile {
+  name: string
+  serverRelativeUrl: string
+  url: string
+}
+
+/** Uploads `file` into an existing folder, overwriting any file already there with the same name. */
+export async function uploadFile(folderServerRelativeUrl: string, file: File): Promise<UploadedFile> {
+  const data = await spFetch(
+    `/GetFolderByServerRelativeUrl('${encodeURI(folderServerRelativeUrl)}')/Files/add(url='${encodeURIComponent(
+      odataLiteral(file.name),
+    )}',overwrite=true)`,
+    { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file },
+  )
+  const serverRelativeUrl = data.d.ServerRelativeUrl as string
+  return { name: data.d.Name as string, serverRelativeUrl, url: new URL(encodeURI(serverRelativeUrl), sharepointConfig.siteUrl).toString() }
+}

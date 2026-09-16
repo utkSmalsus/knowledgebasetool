@@ -20,6 +20,7 @@ import {
 import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, TYPE_DECISION_HELPER, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { isSharePointConfigured } from '../kb/sharepoint/config'
+import { uploadEntryAttachment } from '../kb/sharepoint/documents'
 import {
   MasterTaskLookupResult,
   searchPortfolios,
@@ -60,8 +61,8 @@ const emptyEntry = (type: EntryTypeKey, author: string): Entry => {
   }
 }
 
-// ponytail: prototype has no backend, so files are read into data URLs and kept in
-// localStorage with everything else — fine for a few docs, not for a real file store.
+// ponytail: without SharePoint configured there's no backend, so files are read into data URLs and
+// kept in localStorage with everything else — fine for a few docs, not for a real file store.
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const sizeLabel = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`)
 const readAsDataUrl = (file: File) =>
@@ -193,6 +194,7 @@ export default function EntryForm() {
   const [tagInput, setTagInput] = useState((existing ?? emptyEntry('kt', currentUser.name)).tags.join(', '))
   const [step, setStep] = useState(0)
   const [fileError, setFileError] = useState('')
+  const [uploading, setUploading] = useState(false)
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')
   const [activePicker, setActivePicker] = useState<
     'portfolio' | 'project' | 'task' | 'people' | 'owner' | 'reviewer' | { field: string; multi: boolean } | null
@@ -231,19 +233,32 @@ export default function EntryForm() {
     setFileError('')
     const oversized = Array.from(fileList).find((f) => f.size > MAX_FILE_BYTES)
     if (oversized) {
-      setFileError(`"${oversized.name}" is over 5 MB — too big for this prototype's local storage.`)
+      setFileError(
+        sharePointReady
+          ? `"${oversized.name}" is over 5 MB.`
+          : `"${oversized.name}" is over 5 MB — too big for this prototype's local storage.`,
+      )
       return
     }
-    const uploaded: Attachment[] = await Promise.all(
-      Array.from(fileList).map(async (file) => ({
-        id: `att${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-        name: file.name,
-        url: await readAsDataUrl(file),
-        note: sizeLabel(file.size),
-      })),
-    )
-    setForm((f) => ({ ...f, attachments: [...f.attachments, ...uploaded] }))
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    setUploading(true)
+    try {
+      const uploaded: Attachment[] = sharePointReady
+        ? await Promise.all(Array.from(fileList).map((file) => uploadEntryAttachment(form.type, file)))
+        : await Promise.all(
+            Array.from(fileList).map(async (file) => ({
+              id: `att${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+              name: file.name,
+              url: await readAsDataUrl(file),
+              note: sizeLabel(file.size),
+            })),
+          )
+      setForm((f) => ({ ...f, attachments: [...f.attachments, ...uploaded] }))
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
   const removeAttachment = (attId: string) => setForm((f) => ({ ...f, attachments: f.attachments.filter((a) => a.id !== attId) }))
 
@@ -558,7 +573,14 @@ export default function EntryForm() {
               <EvidenceEditor evidence={form.evidence} onAdd={addEvidence} onRemove={removeEvidence} />
             </div>
 
-            <Field label="Attachments" hint="Docs, screenshots, PDFs — up to 5 MB each">
+            <Field
+              label="Attachments"
+              hint={
+                sharePointReady
+                  ? `Docs, screenshots, PDFs — up to 5 MB each. Stored in SharePoint under Documents/knowledgebasedocuments/${def.label}.`
+                  : 'Docs, screenshots, PDFs — up to 5 MB each'
+              }
+            >
               <div className="space-y-2">
                 {form.attachments.length > 0 && (
                   <ul className="space-y-1.5">
@@ -567,9 +589,9 @@ export default function EntryForm() {
                         key={a.id}
                         className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
                       >
-                        <span className="truncate">
+                        <a href={a.url} target="_blank" rel="noreferrer" className="truncate hover:underline">
                           📎 {a.name} <span className="text-xs text-slate-400">{a.note}</span>
-                        </span>
+                        </a>
                         <button type="button" onClick={() => removeAttachment(a.id)} className="shrink-0 text-xs text-rose-600 hover:underline">
                           Remove
                         </button>
@@ -581,9 +603,11 @@ export default function EntryForm() {
                   ref={fileInputRef}
                   type="file"
                   multiple
+                  disabled={uploading}
                   onChange={(e) => onFilesChosen(e.target.files)}
-                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700 dark:text-slate-300 dark:file:bg-slate-100 dark:file:text-slate-900"
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700 disabled:opacity-50 dark:text-slate-300 dark:file:bg-slate-100 dark:file:text-slate-900"
                 />
+                {uploading && <p className="text-xs text-slate-400">Uploading…</p>}
                 {fileError && <p className="text-xs text-rose-600">{fileError}</p>}
               </div>
             </Field>
