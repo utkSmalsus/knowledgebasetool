@@ -11,6 +11,10 @@ import { useKb } from '../kb/store'
 import { Category, isExpired } from '../types'
 import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input, tone } from '../components/ui'
 
+// Hidden from the Admin UI for now — the sync machinery (provision/pull/push/inspect) stays wired
+// up underneath, flip this back on whenever it needs to be exposed again.
+const SHOW_SHAREPOINT_PANEL = false
+
 export default function Admin() {
   const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, importEntries } = useKb()
   const [newCat, setNewCat] = useState('')
@@ -374,6 +378,7 @@ export default function Admin() {
       </Panel>
 
       {/* ---------- SharePoint connectivity ---------- */}
+      {SHOW_SHAREPOINT_PANEL && (
       <Panel
         title="SharePoint"
         hint="Connects this browser to a SharePoint list on demand — it does not replace local storage as the source of truth. See SHAREPOINT.md for setup."
@@ -529,6 +534,7 @@ export default function Admin() {
           </div>
         </div>
       </Panel>
+      )}
     </div>
   )
 }
