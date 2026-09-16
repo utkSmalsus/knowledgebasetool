@@ -117,7 +117,7 @@ const Ctx = createContext<KbValue | undefined>(undefined)
 
 export function KbProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<Persisted>(load)
-  const { entries, categories, portfolios, role, saved, recentlyViewed } = state
+  const { entries, categories, portfolios, saved, recentlyViewed } = state
 
   useEffect(() => {
     try {
@@ -131,8 +131,10 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
   const patch = (p: Partial<Persisted>) => setState((s) => ({ ...s, ...p }))
   const mapEntries = (fn: (e: Entry) => Entry) => setState((s) => ({ ...s, entries: s.entries.map(fn) }))
 
-  const currentUser = useMemo(() => seedUsers.find((u) => u.role === role) ?? seedUsers[0], [role])
-  const visible = useMemo(() => visibleTo(entries, role), [entries, role])
+  // ponytail: no real roles yet — everyone is admin until the SharePoint super-admin
+  // group check lands (then this resolves from group membership instead of `role`).
+  const currentUser = useMemo(() => seedUsers.find((u) => u.role === 'admin') ?? seedUsers[0], [])
+  const visible = useMemo(() => visibleTo(entries, 'admin'), [entries])
 
   const snapshotOf = (e: Entry): Version['snapshot'] => ({
     title: e.title,

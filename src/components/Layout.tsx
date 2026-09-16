@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { ENTRY_TYPE_KEYS, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
-import { Role, canEdit, canReview } from '../types'
+import { canEdit, canReview } from '../types'
 import CommandPalette from './CommandPalette'
 import { Kbd, btn, input, tone } from './ui'
 
@@ -18,7 +18,7 @@ const NAV_ICON: Record<string, string> = {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { currentUser, setRole, visible } = useKb()
+  const { currentUser, visible } = useKb()
   const location = useLocation()
 
   // SPA navigation doesn't reset scroll on its own — every page should open at the top.
@@ -134,27 +134,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </>
         )}
       </nav>
-
-      {/* Demo-only account switcher — deliberately styled as a dev facility, never a real feature. */}
-      <div className="mt-auto space-y-2 border-t border-dashed border-amber-300/70 bg-amber-50/60 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-          <span aria-hidden>🛠</span> Preview mode
-        </div>
-        <select
-          value={currentUser.role}
-          onChange={(e) => setRole(e.target.value as Role)}
-          className={`${input} border-amber-300 bg-white text-xs dark:border-amber-900/60 dark:bg-slate-950`}
-          title="Demo only — a real deployment reads this from the signed-in session, not a dropdown"
-        >
-          <option value="admin">Admin — Utkarsh</option>
-          <option value="editor">Editor — Priya</option>
-          <option value="viewer">Viewer — Jonas</option>
-          <option value="client">Client — Müller AG</option>
-        </select>
-        <p className="text-[11px] leading-snug text-amber-800/80 dark:text-amber-200/70">
-          Not a real account switcher — lets you preview what each role sees.
-        </p>
-      </div>
     </>
   )
 
