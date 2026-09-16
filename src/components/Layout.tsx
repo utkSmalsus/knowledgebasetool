@@ -10,7 +10,7 @@ const DARK_KEY = 'hochhuth-kb.dark'
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 
 const NAV_ICON: Record<string, string> = {
-  explore: '🧭',
+  dashboard: '⌂',
   saved: '★',
   experts: '🎓',
   review: '✓',
@@ -78,10 +78,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Link>
 
       <nav className="space-y-0.5 px-3">
-        <NavLink to="/browse" className={navCls} onClick={() => setMobileNavOpen(false)}>
+        <NavLink to="/" end className={navCls} onClick={() => setMobileNavOpen(false)}>
           <span className="flex items-center gap-2">
-            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.explore}</span>
-            Explore
+            <span aria-hidden className="w-4 text-center opacity-80">{NAV_ICON.dashboard}</span>
+            Dashboard
           </span>
         </NavLink>
         {/* Saved & recent is disabled — see App.tsx, CommandPalette.tsx, EntryDetail.tsx, Dashboard.tsx, Saved.tsx

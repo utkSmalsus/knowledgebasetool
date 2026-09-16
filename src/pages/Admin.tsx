@@ -12,8 +12,7 @@ import { Category, isExpired } from '../types'
 import { Monogram, PageTitle, Panel, SectionTitle, VerificationBadge, btn, input, tone } from '../components/ui'
 
 export default function Admin() {
-  const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, resetToSeed, importEntries } =
-    useKb()
+  const { categories, portfolios, users, entries, saveCategory, removeCategory, addPortfolio, removePortfolio, importEntries } = useKb()
   const [newCat, setNewCat] = useState('')
   const [newParent, setNewParent] = useState('')
   const [newPortfolio, setNewPortfolio] = useState('')
@@ -144,17 +143,9 @@ export default function Admin() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <PageTitle>Admin</PageTitle>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Knowledge health, taxonomy, and who has access.</p>
-        </div>
-        <button
-          onClick={() => confirm('Reset all entries and categories back to the seed data? Your changes will be lost.') && resetToSeed()}
-          className={btn.ghost}
-        >
-          Reset demo data
-        </button>
+      <div>
+        <PageTitle>Admin</PageTitle>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Knowledge health, taxonomy, and who has access.</p>
       </div>
 
       {/* ---------- Knowledge health ---------- */}

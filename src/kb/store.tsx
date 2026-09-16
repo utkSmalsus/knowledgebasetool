@@ -92,7 +92,6 @@ interface KbValue {
   removeCategory: (id: string) => void
   addPortfolio: (name: string) => void
   removePortfolio: (name: string) => void
-  resetToSeed: () => void
   /** Upserts entries by id — used to merge in entries pulled from an external source (e.g. SharePoint). */
   importEntries: (entries: Entry[]) => void
 
@@ -248,8 +247,6 @@ export function KbProvider({ children }: { children: React.ReactNode }) {
     removePortfolio: (name) =>
       setState((s) => ({ ...s, portfolios: s.portfolios.filter((p) => p !== name) })),
     // entries keep their portfolio string even if removed from the list — same "orphan, don't cascade" rule as categories
-
-    resetToSeed: () => setState(emptyPersisted()),
 
     importEntries: (incoming) =>
       setState((s) => {
