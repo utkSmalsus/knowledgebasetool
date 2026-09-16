@@ -194,7 +194,7 @@ export default function EntryForm() {
   const [fileError, setFileError] = useState('')
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')
   const [activePicker, setActivePicker] = useState<
-    'portfolio' | 'project' | 'task' | 'people' | { field: string; multi: boolean } | null
+    'portfolio' | 'project' | 'task' | 'people' | 'owner' | 'reviewer' | { field: string; multi: boolean } | null
   >(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const def = typeDef(form.type)
@@ -443,84 +443,6 @@ export default function EntryForm() {
               </Field>
             </div>
 
-            {activePicker === 'portfolio' && (
-              <LookupPicker
-                title="Select portfolio"
-                placeholder="Search Master Tasks…"
-                search={searchPortfolios}
-                leadingColumn={masterTaskIdColumn}
-                columns={masterTaskColumns}
-                onSelect={(item: MasterTaskLookupResult) => set('portfolio', item.title)}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-            {activePicker === 'project' && (
-              <LookupPicker
-                title="Select project"
-                placeholder="Search Master Tasks…"
-                search={searchProjects}
-                leadingColumn={masterTaskIdColumn}
-                columns={masterTaskColumns}
-                onSelect={(item: MasterTaskLookupResult) => set('project', item.title)}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-            {activePicker === 'task' && (
-              <LookupPicker
-                title="Add existing task"
-                placeholder="Search across team task lists…"
-                subtitleLabel="List"
-                search={searchTasks}
-                onSelect={(item: TaskLookupResult) => {
-                  set('task', item.title)
-                  set('taskListTitle', item.listTitle)
-                  set('taskItemId', item.itemId)
-                }}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-            {activePicker === 'people' && (
-              <LookupPicker
-                title="Tag people"
-                placeholder="Search team members…"
-                subtitleLabel="Company"
-                search={searchTeamMembers}
-                isSelected={(item: TeamMemberLookupResult) => (form.taggedUsers ?? []).includes(item.title)}
-                onToggle={(item: TeamMemberLookupResult) => toggleTaggedUser(item.title)}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-            {/* Any type's field can ask for a real person/people (see schema.ts's 'person'/'people' kinds) —
-                one shared picker here, driven by which field is currently open rather than one per field. */}
-            {activePicker !== null && typeof activePicker === 'object' && activePicker.multi && (
-              <LookupPicker
-                title="Select people"
-                placeholder="Search team members…"
-                subtitleLabel="Company"
-                search={searchTeamMembers}
-                isSelected={(item: TeamMemberLookupResult) => {
-                  const current = form.details[activePicker.field]
-                  return Array.isArray(current) && current.includes(item.title)
-                }}
-                onToggle={(item: TeamMemberLookupResult) => {
-                  const current = form.details[activePicker.field]
-                  const arr = Array.isArray(current) ? current : []
-                  setDetail(activePicker.field, arr.includes(item.title) ? arr.filter((n) => n !== item.title) : [...arr, item.title])
-                }}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-            {activePicker !== null && typeof activePicker === 'object' && !activePicker.multi && (
-              <LookupPicker
-                title="Select person"
-                placeholder="Search team members…"
-                subtitleLabel="Company"
-                search={searchTeamMembers}
-                onSelect={(item: TeamMemberLookupResult) => setDetail(activePicker.field, item.title)}
-                onClose={() => setActivePicker(null)}
-              />
-            )}
-
             <Field label="Technology / domain">
               <div className="flex flex-wrap gap-1.5">
                 {TECH.map((t) => (
@@ -664,17 +586,30 @@ export default function EntryForm() {
         {step === 4 && (
           <div className="space-y-4">
             <Field label="Owner" hint="Who this knowledge belongs to">
-              <input value={form.author} onChange={(e) => set('author', e.target.value)} className={input} />
+              {sharePointReady ? (
+                <LookupField value={form.author} placeholder="Search team members…" onOpen={() => setActivePicker('owner')} onClear={() => set('author', '')} />
+              ) : (
+                <input value={form.author} onChange={(e) => set('author', e.target.value)} className={input} />
+              )}
             </Field>
             <Field label="Reviewer" hint="Who should review this before it's marked verified">
-              <select value={form.reviewer ?? ''} onChange={(e) => set('reviewer', e.target.value || undefined)} className={input}>
-                <option value="">No one assigned yet</option>
-                {potentialReviewers.map((u) => (
-                  <option key={u.id} value={u.name}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+              {sharePointReady ? (
+                <LookupField
+                  value={form.reviewer}
+                  placeholder="Search team members…"
+                  onOpen={() => setActivePicker('reviewer')}
+                  onClear={() => set('reviewer', undefined)}
+                />
+              ) : (
+                <select value={form.reviewer ?? ''} onChange={(e) => set('reviewer', e.target.value || undefined)} className={input}>
+                  <option value="">No one assigned yet</option>
+                  {potentialReviewers.map((u) => (
+                    <option key={u.id} value={u.name}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
           </div>
         )}
@@ -754,6 +689,104 @@ export default function EntryForm() {
           </div>
         )}
       </div>
+
+      {activePicker === 'portfolio' && (
+        <LookupPicker
+          title="Select portfolio"
+          placeholder="Search Master Tasks…"
+          search={searchPortfolios}
+          leadingColumn={masterTaskIdColumn}
+          columns={masterTaskColumns}
+          onSelect={(item: MasterTaskLookupResult) => set('portfolio', item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker === 'project' && (
+        <LookupPicker
+          title="Select project"
+          placeholder="Search Master Tasks…"
+          search={searchProjects}
+          leadingColumn={masterTaskIdColumn}
+          columns={masterTaskColumns}
+          onSelect={(item: MasterTaskLookupResult) => set('project', item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker === 'task' && (
+        <LookupPicker
+          title="Add existing task"
+          placeholder="Search across team task lists…"
+          subtitleLabel="List"
+          search={searchTasks}
+          onSelect={(item: TaskLookupResult) => {
+            set('task', item.title)
+            set('taskListTitle', item.listTitle)
+            set('taskItemId', item.itemId)
+          }}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker === 'people' && (
+        <LookupPicker
+          title="Tag people"
+          placeholder="Search team members…"
+          subtitleLabel="Company"
+          search={searchTeamMembers}
+          isSelected={(item: TeamMemberLookupResult) => (form.taggedUsers ?? []).includes(item.title)}
+          onToggle={(item: TeamMemberLookupResult) => toggleTaggedUser(item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker === 'owner' && (
+        <LookupPicker
+          title="Select owner"
+          placeholder="Search team members…"
+          subtitleLabel="Company"
+          search={searchTeamMembers}
+          onSelect={(item: TeamMemberLookupResult) => set('author', item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker === 'reviewer' && (
+        <LookupPicker
+          title="Select reviewer"
+          placeholder="Search team members…"
+          subtitleLabel="Company"
+          search={searchTeamMembers}
+          onSelect={(item: TeamMemberLookupResult) => set('reviewer', item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {/* Any type's field can ask for a real person/people (see schema.ts's 'person'/'people' kinds) —
+          one shared picker here, driven by which field is currently open rather than one per field. */}
+      {activePicker !== null && typeof activePicker === 'object' && activePicker.multi && (
+        <LookupPicker
+          title="Select people"
+          placeholder="Search team members…"
+          subtitleLabel="Company"
+          search={searchTeamMembers}
+          isSelected={(item: TeamMemberLookupResult) => {
+            const current = form.details[activePicker.field]
+            return Array.isArray(current) && current.includes(item.title)
+          }}
+          onToggle={(item: TeamMemberLookupResult) => {
+            const current = form.details[activePicker.field]
+            const arr = Array.isArray(current) ? current : []
+            setDetail(activePicker.field, arr.includes(item.title) ? arr.filter((n) => n !== item.title) : [...arr, item.title])
+          }}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
+      {activePicker !== null && typeof activePicker === 'object' && !activePicker.multi && (
+        <LookupPicker
+          title="Select person"
+          placeholder="Search team members…"
+          subtitleLabel="Company"
+          search={searchTeamMembers}
+          onSelect={(item: TeamMemberLookupResult) => setDetail(activePicker.field, item.title)}
+          onClose={() => setActivePicker(null)}
+        />
+      )}
 
       <div className="flex justify-between gap-2">
         <div>
