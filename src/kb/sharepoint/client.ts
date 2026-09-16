@@ -160,8 +160,8 @@ export async function getDistinctFieldValues(listTitle: string, fieldInternalNam
  * An empty query lists everything (still respecting extraFilter/top) so the picker can show the
  * full set scrollable, same as the Meeting tool, rather than requiring a search first.
  */
-export async function searchListItemsByTitle(
-  listTitle: string,
+async function searchListItems(
+  listPath: string,
   query: string,
   opts: { extraFilter?: string; top?: number; select?: string } = {},
 ): Promise<Record<string, unknown>[]> {
@@ -170,10 +170,50 @@ export async function searchListItemsByTitle(
   if (opts.extraFilter) clauses.push(opts.extraFilter)
   const filter = clauses.length ? `&$filter=${encodeURIComponent(clauses.join(' and '))}` : ''
   const data = await spFetch(
-    `${listPathByTitle(listTitle)}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}${filter}&$top=${opts.top ?? 25}&$orderby=Title`,
+    `${listPath}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}${filter}&$top=${opts.top ?? 25}&$orderby=Title`,
     { method: 'GET' },
   )
   return data.d.results ?? []
+}
+
+export const searchListItemsByTitle = (
+  listTitle: string,
+  query: string,
+  opts?: { extraFilter?: string; top?: number; select?: string },
+) => searchListItems(listPathByTitle(listTitle), query, opts)
+
+/** Same as searchListItemsByTitle, but addresses the list by its GUID — needed for the per-team
+ * task lists, which are only known by id (see getTaskSiteLists below), not by a fixed title. */
+export const searchListItemsByGuid = (
+  listGuid: string,
+  query: string,
+  opts?: { extraFilter?: string; top?: number; select?: string },
+) => searchListItems(`/lists(guid'${listGuid}')`, query, opts)
+
+export interface TaskSiteList {
+  title: string
+  listGuid: string
+}
+
+let taskSiteListsCache: Promise<TaskSiteList[]> | null = null
+
+/**
+ * The set of per-team task lists to search — discovered the same way the Meeting tool does, from
+ * the "SmartMetadata" list's "Sites" taxonomy entries (Title = team name, listId = the task list's
+ * GUID), rather than a hardcoded list of names. Cached for the session since this rarely changes.
+ */
+export async function getTaskSiteLists(): Promise<TaskSiteList[]> {
+  if (!taskSiteListsCache) {
+    taskSiteListsCache = spFetch(
+      `${listPathByTitle('SmartMetadata')}/items?$select=Title,listId&$filter=${encodeURIComponent("TaxType eq 'Sites'")}&$top=500`,
+      { method: 'GET' },
+    ).then((data) =>
+      (data.d.results ?? [])
+        .filter((i: any) => !!i.listId)
+        .map((i: any) => ({ title: i.Title, listGuid: i.listId })),
+    )
+  }
+  return taskSiteListsCache
 }
 
 export async function deleteItem(spItemId: number): Promise<void> {
