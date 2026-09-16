@@ -121,6 +121,7 @@ function DetailInput({ def, value, onChange }: { def: FieldDef; value: string | 
 const STEPS = ['Type', 'Title & summary', 'Content', 'Evidence', 'Owner & reviewer', 'Visibility & schedule', 'Preview'] as const
 
 const masterTaskColumns: LookupColumn<MasterTaskLookupResult>[] = [
+  { label: 'ID', render: (item) => item.code ?? '—' },
   { label: 'Due', render: (item) => (item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—') },
   { label: '% Complete', render: (item) => (item.percentComplete != null ? `${Math.round(item.percentComplete * 100)}%` : '—') },
 ]

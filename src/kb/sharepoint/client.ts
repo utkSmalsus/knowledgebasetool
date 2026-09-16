@@ -164,14 +164,15 @@ export async function getDistinctFieldValues(listTitle: string, fieldInternalNam
 async function searchListItems(
   listPath: string,
   query: string,
-  opts: { extraFilter?: string; top?: number; select?: string } = {},
+  opts: { extraFilter?: string; top?: number; select?: string; expand?: string } = {},
 ): Promise<Record<string, unknown>[]> {
   const clauses: string[] = []
   if (query.trim()) clauses.push(`substringof('${odataLiteral(query.trim())}',Title)`)
   if (opts.extraFilter) clauses.push(opts.extraFilter)
   const filter = clauses.length ? `&$filter=${encodeURIComponent(clauses.join(' and '))}` : ''
+  const expand = opts.expand ? `&$expand=${encodeURIComponent(opts.expand)}` : ''
   const data = await spFetch(
-    `${listPath}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}${filter}&$top=${opts.top ?? 25}&$orderby=Title`,
+    `${listPath}/items?$select=${encodeURIComponent(opts.select ?? 'Id,Title')}${expand}${filter}&$top=${opts.top ?? 25}&$orderby=Title`,
     { method: 'GET' },
   )
   return data.d.results ?? []
@@ -180,7 +181,7 @@ async function searchListItems(
 export const searchListItemsByTitle = (
   listTitle: string,
   query: string,
-  opts?: { extraFilter?: string; top?: number; select?: string },
+  opts?: { extraFilter?: string; top?: number; select?: string; expand?: string },
 ) => searchListItems(listPathByTitle(listTitle), query, opts)
 
 /** Same as searchListItemsByTitle, but addresses the list by its GUID — needed for the per-team
@@ -188,7 +189,7 @@ export const searchListItemsByTitle = (
 export const searchListItemsByGuid = (
   listGuid: string,
   query: string,
-  opts?: { extraFilter?: string; top?: number; select?: string },
+  opts?: { extraFilter?: string; top?: number; select?: string; expand?: string },
 ) => searchListItems(`/lists(guid'${listGuid}')`, query, opts)
 
 export interface TaskSiteList {

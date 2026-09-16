@@ -145,7 +145,9 @@ export default function LookupPicker<T extends LookupItem>({
                           <input type="checkbox" checked={checked} readOnly className="pointer-events-none" />
                         </td>
                       )}
-                      <td className="max-w-xs truncate px-4 py-2">{r.title}</td>
+                      <td className="max-w-xs truncate px-4 py-2" style={{ paddingLeft: `${1 + ((r as { depth?: number }).depth ?? 0) * 1.25}rem` }}>
+                        {r.title}
+                      </td>
                       <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">{r.subtitle}</td>
                       {columns?.map((c) => (
                         <td key={c.label} className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
