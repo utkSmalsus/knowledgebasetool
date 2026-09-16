@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import FeedbackWidget from '../components/FeedbackWidget'
-import LookupPicker, { LookupItem } from '../components/LookupPicker'
+import LookupPicker, { LookupColumn } from '../components/LookupPicker'
 import { useToast } from '../components/Toast'
 import {
   EvidenceRow,
@@ -19,7 +19,7 @@ import {
 import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, TYPE_DECISION_HELPER, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { isSharePointConfigured } from '../kb/sharepoint/config'
-import { searchPortfolios, searchProjects, searchTasks, TaskLookupResult } from '../kb/sharepoint/lookup'
+import { MasterTaskLookupResult, searchPortfolios, searchProjects, searchTasks, TaskLookupResult } from '../kb/sharepoint/lookup'
 import { Attachment, Details, Entry, Evidence, EntryStatus, REVIEW_INTERVALS, Visibility } from '../types'
 
 const emptyEntry = (type: EntryTypeKey, author: string): Entry => {
@@ -111,6 +111,11 @@ function DetailInput({ def, value, onChange }: { def: FieldDef; value: string | 
 }
 
 const STEPS = ['Type', 'Title & summary', 'Content', 'Evidence', 'Owner & reviewer', 'Visibility & schedule', 'Preview'] as const
+
+const masterTaskColumns: LookupColumn<MasterTaskLookupResult>[] = [
+  { label: 'Due', render: (item) => (item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—') },
+  { label: '% Complete', render: (item) => (item.percentComplete != null ? `${Math.round(item.percentComplete * 100)}%` : '—') },
+]
 
 export default function EntryForm() {
   const { id } = useParams()
@@ -377,7 +382,8 @@ export default function EntryForm() {
                 title="Select portfolio"
                 placeholder="Search Master Tasks…"
                 search={searchPortfolios}
-                onSelect={(item: LookupItem) => set('portfolio', item.title)}
+                columns={masterTaskColumns}
+                onSelect={(item: MasterTaskLookupResult) => set('portfolio', item.title)}
                 onClose={() => setActivePicker(null)}
               />
             )}
@@ -386,7 +392,8 @@ export default function EntryForm() {
                 title="Select project"
                 placeholder="Search Master Tasks…"
                 search={searchProjects}
-                onSelect={(item: LookupItem) => set('project', item.title)}
+                columns={masterTaskColumns}
+                onSelect={(item: MasterTaskLookupResult) => set('project', item.title)}
                 onClose={() => setActivePicker(null)}
               />
             )}
@@ -394,6 +401,7 @@ export default function EntryForm() {
               <LookupPicker
                 title="Add existing task"
                 placeholder="Search across team task lists…"
+                subtitleLabel="List"
                 search={searchTasks}
                 onSelect={(item: TaskLookupResult) => {
                   set('task', item.title)

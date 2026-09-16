@@ -70,12 +70,14 @@ export async function getMsalToken(): Promise<string> {
 
   const account = app.getActiveAccount() ?? app.getAllAccounts()[0]
   if (account) {
-    const { InteractionRequiredAuthError } = await import('@azure/msal-browser')
+    // Silent acquisition can fail for more than just "needs interaction" (e.g. the hidden
+    // iframe timing out) — any failure here falls back to interactive sign-in below rather
+    // than surfacing a raw MSAL error to the caller.
     try {
       const result = await app.acquireTokenSilent({ scopes: scopes(), account })
       return result.accessToken
-    } catch (e) {
-      if (!(e instanceof InteractionRequiredAuthError)) throw e
+    } catch {
+      /* fall through to interactive sign-in below */
     }
   }
 

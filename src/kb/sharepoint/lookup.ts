@@ -7,15 +7,28 @@ export interface LookupResult {
   subtitle?: string
 }
 
+export interface MasterTaskLookupResult extends LookupResult {
+  dueDate?: string
+  percentComplete?: number
+}
+
 /** itemTypes is a small set of known Item_x0020_Type constants (see provision.ts), never user input. */
-async function searchMasterTasksByTypes(itemTypes: string[], query: string): Promise<LookupResult[]> {
+async function searchMasterTasksByTypes(itemTypes: string[], query: string): Promise<MasterTaskLookupResult[]> {
   const typeClause = itemTypes.map((t) => `Item_x0020_Type eq '${t}'`).join(' or ')
   const items = await searchListItemsByTitle(MASTER_TASKS_LIST, query, {
     extraFilter: `(${typeClause})`,
-    select: 'Id,Title,Item_x0020_Type',
+    select: 'Id,Title,Item_x0020_Type,DueDate,PercentComplete',
     top: 300,
   })
-  return items.map((i: any) => ({ id: String(i.Id), title: i.Title, subtitle: i.Item_x0020_Type }))
+  return items
+    .filter((i: any) => !!i.Title)
+    .map((i: any) => ({
+      id: String(i.Id),
+      title: i.Title,
+      subtitle: i.Item_x0020_Type,
+      dueDate: i.DueDate ?? undefined,
+      percentComplete: typeof i.PercentComplete === 'number' ? i.PercentComplete : undefined,
+    }))
 }
 
 export const searchPortfolios = (query: string) => searchMasterTasksByTypes(PORTFOLIO_ITEM_TYPES, query)
@@ -38,7 +51,9 @@ export async function searchTasks(query: string): Promise<TaskLookupResult[]> {
     TASK_LISTS.map(async (listTitle) => {
       try {
         const items = await searchListItemsByTitle(listTitle, query, { select: 'Id,Title', top: 30 })
-        return items.map((i: any) => ({ id: `${listTitle}:${i.Id}`, title: i.Title, subtitle: listTitle, listTitle, itemId: i.Id as number }))
+        return items
+          .filter((i: any) => !!i.Title) // some items in these lists (e.g. section headers) have no Title
+          .map((i: any) => ({ id: `${listTitle}:${i.Id}`, title: i.Title, subtitle: listTitle, listTitle, itemId: i.Id as number }))
       } catch {
         return [] // a list that doesn't exist on this tenant/site shouldn't break the others
       }
