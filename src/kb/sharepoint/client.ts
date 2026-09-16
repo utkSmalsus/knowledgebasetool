@@ -16,7 +16,8 @@ async function authHeaders(method: Method): Promise<Record<string, string>> {
   return { 'X-RequestDigest': await getRequestDigest() }
 }
 
-async function spFetch(path: string, init: RequestInit & { method: Method }) {
+/** Same-tenant sites share one bearer token (scoped to the tenant origin, not a specific site path). */
+async function spFetch(path: string, init: RequestInit & { method: Method }, siteUrl: string = sharepointConfig.siteUrl) {
   if (!isSharePointConfigured()) {
     throw new Error('SharePoint is not configured — set VITE_SP_SITE_URL (and the VITE_MSAL_* vars, if using msal mode). See SHAREPOINT.md.')
   }
@@ -26,7 +27,7 @@ async function spFetch(path: string, init: RequestInit & { method: Method }) {
     ...(await authHeaders(init.method)),
     ...(init.headers as Record<string, string> | undefined),
   }
-  const res = await fetch(`${sharepointConfig.siteUrl}/_api/web${path}`, {
+  const res = await fetch(`${siteUrl}/_api/web${path}`, {
     ...init,
     method: init.method === 'MERGE' ? 'POST' : init.method, // MERGE/DELETE ride on POST + X-HTTP-Method for browser fetch compatibility
     headers,
@@ -214,6 +215,60 @@ export async function getTaskSiteLists(): Promise<TaskSiteList[]> {
     )
   }
   return taskSiteListsCache
+}
+
+interface SiteConfigEntry {
+  siteName: string
+  siteUrl: string
+  taskUserListGuid?: string
+}
+
+let rootDashboardConfigCache: Promise<SiteConfigEntry[]> | null = null
+
+/** The tenant's root site (one path segment up from the configured site) — where RootDashboardConfig lives. */
+function tenantRootSiteUrl(): string {
+  const url = new URL(sharepointConfig.siteUrl)
+  const segments = url.pathname.split('/').filter(Boolean)
+  segments.pop()
+  return `${url.origin}/${segments.join('/')}`
+}
+
+/**
+ * Per-site config (site url, Task Users list id, …) — read from the "SmartMetadata" list's
+ * "RootDashboardConfig" item, the same source the Meeting tool's own team-member picker uses,
+ * rather than hardcoding a list id that only holds for one tenant/site. This item lives on the
+ * tenant's root site, not the configured site itself — same bearer token works for both since
+ * SharePoint tokens are scoped to the tenant origin, not one specific site path.
+ */
+async function getRootDashboardConfig(): Promise<SiteConfigEntry[]> {
+  if (!rootDashboardConfigCache) {
+    rootDashboardConfigCache = spFetch(
+      `${listPathByTitle('SmartMetadata')}/items?$select=Title,Configurations&$filter=${encodeURIComponent("Title eq 'RootDashboardConfig'")}&$top=1`,
+      { method: 'GET' },
+      tenantRootSiteUrl(),
+    )
+      .then((data) => {
+        const raw = data.d.results?.[0]?.Configurations
+        if (typeof raw !== 'string') return []
+        try {
+          const parsed = JSON.parse(raw)
+          return Array.isArray(parsed)
+            ? parsed.map((c: any) => ({ siteName: c.siteName, siteUrl: c.siteUrl, taskUserListGuid: c.TaskUserListID }))
+            : []
+        } catch {
+          return []
+        }
+      })
+      .catch(() => [])
+  }
+  return rootDashboardConfigCache
+}
+
+/** The Task Users list id for the currently configured site, or undefined if not found. */
+export async function getTaskUserListGuid(): Promise<string | undefined> {
+  const config = await getRootDashboardConfig()
+  const site = config.find((c) => c.siteUrl?.replace(/\/+$/, '').toLowerCase() === sharepointConfig.siteUrl.toLowerCase())
+  return site?.taskUserListGuid
 }
 
 export async function deleteItem(spItemId: number): Promise<void> {

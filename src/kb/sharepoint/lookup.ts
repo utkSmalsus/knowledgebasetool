@@ -1,4 +1,4 @@
-import { getTaskSiteLists, searchListItemsByGuid, searchListItemsByTitle } from './client'
+import { getTaskSiteLists, getTaskUserListGuid, searchListItemsByGuid, searchListItemsByTitle } from './client'
 import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPES, PROJECT_ITEM_TYPES } from './provision'
 
 export interface LookupResult {
@@ -60,4 +60,36 @@ export async function searchTasks(query: string): Promise<TaskLookupResult[]> {
     }),
   )
   return perList.flat().sort((a, b) => a.title.localeCompare(b.title))
+}
+
+export interface TeamMemberLookupResult extends LookupResult {
+  email: string
+}
+
+/**
+ * Real people to tag — from the same "Task Users" list the Meeting tool's Create Meeting
+ * attendee picker uses. That list also holds team/group placeholder rows (e.g. "Developers
+ * Team") with no Email — those aren't real people, so they're filtered out.
+ */
+export async function searchTeamMembers(query: string): Promise<TeamMemberLookupResult[]> {
+  const listGuid = await getTaskUserListGuid()
+  if (!listGuid) return []
+  const items = await searchListItemsByGuid(listGuid, query, {
+    select: 'Id,Title,Email,Company,Status,isDeleted',
+    top: 200,
+  })
+  // Filtered client-side, not via $filter: this list's Status/isDeleted are Yes/No columns and
+  // SharePoint's classic REST OData doesn't reliably accept `eq true`/`eq false` for those.
+  return items
+    .filter((i: any) => !!i.Title && !!i.Email && i.Status !== false && i.isDeleted !== true)
+    .map((i: any) => ({ id: String(i.Id), title: i.Title, subtitle: i.Company, email: i.Email }))
+}
+
+/** Exact-title lookup used when resolving a tagged name back to a real email for Push — see mapping.ts. */
+export async function findTeamMemberEmailByTitle(title: string): Promise<string | undefined> {
+  const listGuid = await getTaskUserListGuid()
+  if (!listGuid) return undefined
+  const items = await searchListItemsByGuid(listGuid, title, { select: 'Id,Title,Email', top: 10 })
+  const match = items.find((i: any) => i.Title === title && !!i.Email)
+  return match ? ((match as any).Email as string) : undefined
 }

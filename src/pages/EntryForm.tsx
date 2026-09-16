@@ -19,7 +19,15 @@ import {
 import { EVIDENCE_TYPES, ENTRY_STATUSES, ENTRY_TYPE_KEYS, EntryTypeKey, FieldDef, TECH, TYPE_DECISION_HELPER, typeDef } from '../kb/schema'
 import { useKb } from '../kb/store'
 import { isSharePointConfigured } from '../kb/sharepoint/config'
-import { MasterTaskLookupResult, searchPortfolios, searchProjects, searchTasks, TaskLookupResult } from '../kb/sharepoint/lookup'
+import {
+  MasterTaskLookupResult,
+  searchPortfolios,
+  searchProjects,
+  searchTasks,
+  searchTeamMembers,
+  TaskLookupResult,
+  TeamMemberLookupResult,
+} from '../kb/sharepoint/lookup'
 import { Attachment, Details, Entry, Evidence, EntryStatus, REVIEW_INTERVALS, Visibility } from '../types'
 
 const emptyEntry = (type: EntryTypeKey, author: string): Entry => {
@@ -129,7 +137,7 @@ export default function EntryForm() {
   const [step, setStep] = useState(0)
   const [fileError, setFileError] = useState('')
   const [reviewInterval, setReviewInterval] = useState(existing?.verification.reviewIntervalDays ? String(existing.verification.reviewIntervalDays) : '90')
-  const [activePicker, setActivePicker] = useState<'portfolio' | 'project' | 'task' | null>(null)
+  const [activePicker, setActivePicker] = useState<'portfolio' | 'project' | 'task' | 'people' | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const def = typeDef(form.type)
   const sharePointReady = isSharePointConfigured()
@@ -411,6 +419,17 @@ export default function EntryForm() {
                 onClose={() => setActivePicker(null)}
               />
             )}
+            {activePicker === 'people' && (
+              <LookupPicker
+                title="Tag people"
+                placeholder="Search team members…"
+                subtitleLabel="Company"
+                search={searchTeamMembers}
+                isSelected={(item: TeamMemberLookupResult) => (form.taggedUsers ?? []).includes(item.title)}
+                onToggle={(item: TeamMemberLookupResult) => toggleTaggedUser(item.title)}
+                onClose={() => setActivePicker(null)}
+              />
+            )}
 
             <Field label="Technology / domain">
               <div className="flex flex-wrap gap-1.5">
@@ -431,25 +450,48 @@ export default function EntryForm() {
               </div>
             </Field>
 
-            <Field label="Tag people" hint="Loop in other users on this entry">
-              <div className="flex flex-wrap gap-1.5">
-                {users
-                  .filter((u) => u.name !== currentUser.name)
-                  .map((u) => (
-                    <button
-                      type="button"
-                      key={u.id}
-                      onClick={() => toggleTaggedUser(u.name)}
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
-                        (form.taggedUsers ?? []).includes(u.name)
-                          ? 'bg-sky-600 text-white ring-sky-600'
-                          : 'bg-white text-slate-600 ring-slate-300 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700'
-                      }`}
+            <Field label="Tag people" hint={sharePointReady ? 'Loop in real team members' : 'Loop in other users on this entry'}>
+              {sharePointReady ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(form.taggedUsers ?? []).map((name) => (
+                    <span
+                      key={name}
+                      className="flex items-center gap-1 rounded-full bg-sky-600 px-2.5 py-1 text-xs font-medium text-white ring-1 ring-inset ring-sky-600"
                     >
-                      {u.name}
-                    </button>
+                      {name}
+                      <button type="button" onClick={() => toggleTaggedUser(name)} className="text-white/80 hover:text-white">
+                        ✕
+                      </button>
+                    </span>
                   ))}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setActivePicker('people')}
+                    className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-800"
+                  >
+                    + Add people
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {users
+                    .filter((u) => u.name !== currentUser.name)
+                    .map((u) => (
+                      <button
+                        type="button"
+                        key={u.id}
+                        onClick={() => toggleTaggedUser(u.name)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${
+                          (form.taggedUsers ?? []).includes(u.name)
+                            ? 'bg-sky-600 text-white ring-sky-600'
+                            : 'bg-white text-slate-600 ring-slate-300 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700'
+                        }`}
+                      >
+                        {u.name}
+                      </button>
+                    ))}
+                </div>
+              )}
             </Field>
 
             {def.stages && def.stages.length > 0 && (

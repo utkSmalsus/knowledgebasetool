@@ -1,5 +1,6 @@
 import { Entry, User } from '../../types'
 import { ensureSiteUser, findItemIdByTitleAndType } from './client'
+import { findTeamMemberEmailByTitle } from './lookup'
 import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPES, PROJECT_ITEM_TYPES } from './provision'
 
 /**
@@ -8,7 +9,9 @@ import { MASTER_TASKS_LIST, PORTFOLIO_ITEM_TYPES, PROJECT_ITEM_TYPES } from './p
  * nested (arrays, objects) round-trips as a JSON string in a Note column.
  * Portfolio/Project are real Lookup columns into Master Tasks — resolved by
  * title-search here, never by creating anything there. TaggedUsers is a
- * native multi-value Person field, resolved via each local User's `upn`.
+ * native multi-value Person field, resolved via each local User's `upn`,
+ * falling back to a live Task Users lookup for people tagged via the real
+ * team-member picker (see lookup.ts's findTeamMemberEmailByTitle).
  */
 
 function parseJsonField<T>(value: unknown, fallback: T): T {
@@ -26,9 +29,11 @@ export async function entryToListItemFields(entry: Entry, users: User[]): Promis
     entry.project ? findItemIdByTitleAndType(MASTER_TASKS_LIST, entry.project, 'Item_x0020_Type', PROJECT_ITEM_TYPES) : undefined,
   ])
 
-  const taggedUpns = (entry.taggedUsers ?? [])
-    .map((name) => users.find((u) => u.name === name)?.upn)
-    .filter((upn): upn is string => !!upn)
+  const taggedUpns = (
+    await Promise.all(
+      (entry.taggedUsers ?? []).map((name) => users.find((u) => u.name === name)?.upn ?? findTeamMemberEmailByTitle(name)),
+    )
+  ).filter((upn): upn is string => !!upn)
   const taggedUserIds = (await Promise.all(taggedUpns.map((upn) => ensureSiteUser(upn)))).filter((id): id is number => id !== undefined)
 
   return {

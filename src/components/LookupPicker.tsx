@@ -13,12 +13,16 @@ export interface LookupColumn<T> {
 }
 
 /**
- * A search-and-select popup for picking a real item from SharePoint (Portfolio/Project from
- * Master Tasks, Task across the per-team task lists) — the same table-of-results, click-a-row
- * pattern the Meeting tool's Select Portfolio/Select Project/Add Existing Task popups use,
- * reimplemented against this app's own plain-Tailwind UI instead of porting its Fluent UI /
- * tanstack-table machinery (no per-column filters, multi-select, or Compare/Add Structure — this
- * app only ever needs to pick one item and attach it to an entry).
+ * A search-and-select popup for picking real item(s) from SharePoint (Portfolio/Project from
+ * Master Tasks, Task across the per-team task lists, people from Task Users) — the same
+ * table-of-results, click-a-row pattern the Meeting tool's Select Portfolio/Select
+ * Project/Add Existing Task/attendee popups use, reimplemented against this app's own
+ * plain-Tailwind UI instead of porting its Fluent UI / tanstack-table machinery (no
+ * per-column filters or Compare/Add Structure).
+ *
+ * Single-select (pass `onSelect`): click a row to pick it and close, e.g. Portfolio/Project/Task.
+ * Multi-select (pass `onToggle` + `isSelected`): click a row to toggle it, popup stays open with
+ * a Done button — e.g. tagging several people on an entry.
  */
 export default function LookupPicker<T extends LookupItem>({
   title,
@@ -27,6 +31,8 @@ export default function LookupPicker<T extends LookupItem>({
   columns,
   search,
   onSelect,
+  onToggle,
+  isSelected,
   onClose,
 }: {
   title: string
@@ -36,7 +42,11 @@ export default function LookupPicker<T extends LookupItem>({
   /** Extra columns shown after Title/subtitle — e.g. Due date, % complete. */
   columns?: LookupColumn<T>[]
   search: (query: string) => Promise<T[]>
-  onSelect: (item: T) => void
+  /** Single-select: picking a row selects it and closes the popup. */
+  onSelect?: (item: T) => void
+  /** Multi-select: picking a row toggles it; popup stays open. Pair with `isSelected`. */
+  onToggle?: (item: T) => void
+  isSelected?: (item: T) => boolean
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -44,6 +54,7 @@ export default function LookupPicker<T extends LookupItem>({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const multiSelect = !!onToggle
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -77,9 +88,13 @@ export default function LookupPicker<T extends LookupItem>({
     }
   }, [query, search])
 
-  const select = (item: T) => {
-    onSelect(item)
-    onClose()
+  const rowClick = (item: T) => {
+    if (multiSelect) {
+      onToggle?.(item)
+    } else {
+      onSelect?.(item)
+      onClose()
+    }
   }
 
   return (
@@ -106,6 +121,7 @@ export default function LookupPicker<T extends LookupItem>({
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 <tr>
+                  {multiSelect && <th className="w-8 px-4 py-2" />}
                   <th className="px-4 py-2 font-semibold">Title</th>
                   <th className="px-4 py-2 font-semibold">{subtitleLabel}</th>
                   {columns?.map((c) => (
@@ -116,25 +132,45 @@ export default function LookupPicker<T extends LookupItem>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {results.map((r) => (
-                  <tr
-                    key={r.id}
-                    onClick={() => select(r)}
-                    className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <td className="max-w-xs truncate px-4 py-2">{r.title}</td>
-                    <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">{r.subtitle}</td>
-                    {columns?.map((c) => (
-                      <td key={c.label} className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
-                        {c.render(r)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {results.map((r) => {
+                  const checked = !!isSelected?.(r)
+                  return (
+                    <tr
+                      key={r.id}
+                      onClick={() => rowClick(r)}
+                      className={`cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 ${checked ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
+                    >
+                      {multiSelect && (
+                        <td className="px-4 py-2">
+                          <input type="checkbox" checked={checked} readOnly className="pointer-events-none" />
+                        </td>
+                      )}
+                      <td className="max-w-xs truncate px-4 py-2">{r.title}</td>
+                      <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">{r.subtitle}</td>
+                      {columns?.map((c) => (
+                        <td key={c.label} className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
+                          {c.render(r)}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
         </div>
+
+        {multiSelect && (
+          <div className="flex justify-end border-t border-slate-200 p-3 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-slate-900"
+            >
+              Done
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
